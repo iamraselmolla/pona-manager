@@ -30,7 +30,7 @@ export const DeliveryDetailsScreen = () => {
   useEffect(() => {
     deliveryAPI
       .getById(deliveryId)
-      .then((res: any) => {
+      .then((res) => {
         setDelivery(res.data.data);
         setLoading(false);
       })
