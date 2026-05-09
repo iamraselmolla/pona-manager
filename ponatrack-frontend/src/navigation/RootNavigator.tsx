@@ -16,12 +16,16 @@ import { DailyClosingScreen } from "../screens/closing/DailyClosingScreen";
 import { DailyClosingHistoryScreen } from "../screens/closing/DailyClosingHistoryScreen";
 import { DailyReportScreen } from "../screens/reports/DailyReportScreen";
 import { MonthlyReportScreen } from "../screens/reports/MonthlyReportScreen";
-import { CustomerDueReportScreen } from "../screens/reports/CustomerDueReportScreen";
-import { ExpenseReportScreen } from "../screens/reports/ExpenseReportScreen";
-import { ProfitLossReportScreen } from "../screens/reports/ProfitLossReportScreen";
-import { NotificationScreen } from "../screens/notifications/NotificationScreen";
-import { ProfileScreen } from "../screens/settings/ProfileScreen";
-import { AppSettingsScreen } from "../screens/settings/AppSettingsScreen";
+import {
+  CustomerDueReportScreen,
+  ExpenseReportScreen,
+  ProfitLossReportScreen,
+} from "../screens/reports/CustomerDueReportScreen";
+import {
+  AppSettingsScreen,
+  NotificationScreen,
+  ProfileScreen,
+} from "../screens/notifications/NotificationScreen";
 import { RootStackParamList } from "../types";
 import { COLORS } from "../constants";
 
