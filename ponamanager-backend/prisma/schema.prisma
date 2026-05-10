@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("staff")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Customer {
+  id               String   @id @default(cuid())
+  name             String
+  mobile           String   @unique
+  address          String?
+  area             String?
+  totalOrders      Int      @default(0)
+  totalPLPurchased Float    @default(0)
+  totalPaid        Float    @default(0)
+  totalDue         Float    @default(0)
+  hasRunningOrder  Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  orders   Order[]
+  payments Payment[]
+  notes    CustomerNote[]
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  customerId      String?
+  customerName    String
+  customerMobile  String
+  customerAddress String?
+  ponaType        String
+  plQuantity      Float
+  unitRate        Float
+  totalPrice      Float
+  advanceAmount   Float    @default(0)
+  dueAmount       Float    @default(0)
+  deliveryDate    String
+  status          String   @default("pending")
+  batchId         String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+  batch       Batch?       @relation(fields: [batchId], references: [id])
+  batchOrders BatchOrder[]
+  payments    Payment[]
+}
+
+model Batch {
+  id                     String    @id @default(cuid())
+  batchNumber            String    @unique
+  batchDate              String
+  status                 String    @default("pending")
+  totalOrderedGolda      Float     @default(0)
+  totalDeliveredGolda    Float     @default(0)
+  totalOrderedBagda      Float     @default(0)
+  totalDeliveredBagda    Float     @default(0)
+  totalOrderedVannamei   Float     @default(0)
+  totalDeliveredVannamei Float     @default(0)
+  totalCollected         Float     @default(0)
+  totalDue               Float     @default(0)
+  totalExpenses          Float     @default(0)
+  totalProfit            Float     @default(0)
+  pendingDeliveries      Int       @default(0)
+  duePendingCount        Int       @default(0)
+  completedAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  batchOrders BatchOrder[]
+  expenses    BatchExpense[]
+  orders      Order[]
+}
+
+model BatchOrder {
+  id                String    @id @default(cuid())
+  batchId           String
+  orderId           String
+  deliveryStatus    String    @default("pending")
+  deliveredQuantity Float?
+  deliveryRate      Float?
+  finalAmount       Float?
+  customerPayment   Float?
+  dueAmount         Float?
+  duePaymentDate    String?
+  notes             String?
+  deliveredAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+model BatchExpense {
+  id      String @id @default(cuid())
+  batchId String
+  label   String
+  amount  Float
+
+  batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  customerId String
+  orderId    String
+  amount     Float
+  date       String
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  order    Order    @relation(fields: [orderId], references: [id])
+}
+
+model Expense {
+  id        String   @id @default(cuid())
+  amount    Float
+  category  String
+  date      String
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model DailyClosing {
+  id               String   @id @default(cuid())
+  date             String   @unique
+  totalOrders      Int      @default(0)
+  totalDeliveries  Int      @default(0)
+  totalSales       Float    @default(0)
+  totalCollections Float    @default(0)
+  totalDue         Float    @default(0)
+  totalExpenses    Float    @default(0)
+  totalCompanyMir  Float    @default(0)
+  totalCountingMir Float    @default(0)
+  transportExpense Float    @default(0)
+  laborExpense     Float    @default(0)
+  otherExpenses    Float    @default(0)
+  netProfitLoss    Float    @default(0)
+  cashInHand       Float    @default(0)
+  closedAt         DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model CustomerNote {
+  id         String   @id @default(cuid())
+  customerId String
+  content    String
+  createdAt  DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+}

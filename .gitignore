@@ -1,15 +1,2 @@
-ponatrack-frontend/node_modules
-ponatrack-frontend/dist
-ponatrack-frontend/.env
-ponatrack-frontend/.env.local
-ponatrack-frontend/.env.development.local
-ponatrack-frontend/.env.test.local
-ponatrack-frontend/.env.production.local
-
-ponatrack-backend/node_modules
-ponatrack-backend/dist
-ponatrack-backend/.env
-ponatrack-backend/.env.local
-ponatrack-backend/.env.development.local
-ponatrack-backend/.env.test.local
-ponatrack-backend/.env.production.local
+ponamanager-front/node_modules
+ponamanager-backend/node_modules
