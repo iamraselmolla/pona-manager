@@ -1,7 +1,7 @@
 // src/utils/database.ts
-import * as SQLite from "expo-sqlite";
+import * as SQLite from "expo-sqlite/legacy";
 
-let db: SQLite.SQLiteDatabase;
+let db: any;
 
 export const initDatabase = async () => {
   db = await SQLite.openDatabaseAsync("ponatrack.db");
