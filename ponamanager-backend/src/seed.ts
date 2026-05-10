@@ -1,39 +1,65 @@
 // src/seed.ts
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
+const users = [
+  {
+    name: "Emadadul Haq",
+    email: "emadadul@ponatrack.com",
+    phone: "01712773044",
+    password: "pona1234",
+    role: "admin",
+  },
+  {
+    name: "Md Rasel Molla",
+    email: "rasel@ponatrack.com",
+    phone: "01944835365",
+    password: "pona1234",
+    role: "admin",
+  },
+];
+
 async function main() {
-  console.log('🌱 Seeding database...');
+  console.log("🌱 Seeding users...\n");
 
-  // Admin user
-  const hashed = await bcrypt.hash('admin123', 10);
-  await prisma.user.upsert({
-    where: { email: 'admin@ponatrack.com' },
-    update: {},
-    create: { name: 'Admin User', email: 'admin@ponatrack.com', password: hashed, role: 'admin' },
-  });
+  for (const u of users) {
+    const hashed = await bcrypt.hash(u.password, 10);
 
-  // Sample customers
-  const customers = [
-    { name: 'রহিম মিয়া', mobile: '01711234567', address: 'পটুয়াখালী', area: 'বাউফল' },
-    { name: 'করিম শেখ', mobile: '01811234568', address: 'বরগুনা', area: 'আমতলী' },
-    { name: 'জসিম উদ্দিন', mobile: '01911234569', address: 'পিরোজপুর', area: 'মঠবাড়িয়া' },
-  ];
-
-  for (const c of customers) {
-    await prisma.customer.upsert({
-      where: { mobile: c.mobile },
-      update: {},
-      create: c,
+    const created = await prisma.user.upsert({
+      where: { email: u.email },
+      update: {
+        name: u.name,
+        phone: u.phone,
+        password: hashed,
+        role: u.role,
+      },
+      create: {
+        name: u.name,
+        email: u.email,
+        phone: u.phone,
+        password: hashed,
+        role: u.role,
+      },
     });
+
+    console.log(`✅ ${created.role.toUpperCase().padEnd(6)} → ${created.name}`);
+    console.log(`         Email: ${created.email}`);
+    console.log(`         Phone: ${created.phone}`);
+    console.log(`         Pass:  ${u.password}\n`);
   }
 
-  console.log('✅ Seed completed!');
-  console.log('📧 Login: admin@ponatrack.com | 🔑 Password: admin123');
+  console.log("─────────────────────────────────────");
+  console.log("Login with EMAIL or PHONE + password");
+  console.log("─────────────────────────────────────");
 }
 
 main()
-  .then(() => process.exit(0))
-  .catch((e) => { console.error(e); process.exit(1); });
+  .catch((e) => {
+    console.error("❌ Error:", e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

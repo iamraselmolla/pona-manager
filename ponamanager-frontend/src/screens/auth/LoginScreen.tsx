@@ -20,19 +20,19 @@ import { COLORS } from "../../constants";
 export const LoginScreen = () => {
   const navigation = useNavigation<any>();
   const { login } = useAuthStore();
-  const [email, setEmail] = useState("admin@ponamanager.com");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    if (!identifier || !password) {
       Alert.alert("Error", "Please enter email and password");
       return;
     }
     setLoading(true);
     try {
-      await login(email, password);
+      await login(identifier, password);
     } catch (err: any) {
       Alert.alert(
         "Login Failed",
@@ -75,9 +75,9 @@ export const LoginScreen = () => {
               <TextInput
                 style={styles.input}
                 placeholder="Enter email"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
+                value={identifier}
+                onChangeText={setIdentifier}
+                keyboardType="email-phone"
                 autoCapitalize="none"
                 placeholderTextColor={COLORS.textMuted}
               />
@@ -134,7 +134,9 @@ export const LoginScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.footer}>ponamanager © 2024</Text>
+        <Text style={styles.footer}>
+          Pona Manager © {new Date().getFullYear()}
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
