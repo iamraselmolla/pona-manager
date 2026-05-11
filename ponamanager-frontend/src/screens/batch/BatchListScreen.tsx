@@ -1,5 +1,5 @@
 // src/screens/batch/BatchListScreen.tsx
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -8,174 +8,266 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
-  TextInput,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { batchAPI } from "../../api/batchServices";
 import { Batch, BatchStatus } from "../../types";
-import { COLORS } from "../../constants";
 import { formatCurrency, formatDate } from "../../utils/helpers";
 import dayjs from "dayjs";
 
-// ── Batch status colours ────────────────────────────────
+// ─── Design tokens ─────────────────────────────────────────────────────────────
+const P = {
+  bg: "#0F1117",
+  surface: "#1A1D27",
+  border: "rgba(255,255,255,0.07)",
+  accent: "#6C63FF",
+  accentSoft: "rgba(108,99,255,0.15)",
+  danger: "#FF5E7E",
+  dangerSoft: "rgba(255,94,126,0.12)",
+  success: "#2ECC71",
+  successSoft: "rgba(46,204,113,0.12)",
+  warning: "#F0A500",
+  warningSoft: "rgba(240,165,0,0.12)",
+  info: "#3B9EFF",
+  infoSoft: "rgba(59,158,255,0.12)",
+  teal: "#00C9A7",
+  tealSoft: "rgba(0,201,167,0.12)",
+  gold: "#F5C542",
+  goldSoft: "rgba(245,197,66,0.12)",
+  textPrimary: "#F0F2FF",
+  textSecondary: "#8A8FA8",
+  textMuted: "#545872",
+  white: "#FFFFFF",
+};
+
+// ─── Status config ──────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<
   BatchStatus,
-  { label: string; bg: string; border: string; icon: any; textColor: string }
+  { label: string; color: string; soft: string; icon: any; track: string }
 > = {
   pending: {
     label: "অপেক্ষমান",
-    bg: "#FFF8E1",
-    border: "#F5A623",
+    color: P.warning,
+    soft: P.warningSoft,
     icon: "time-outline",
-    textColor: "#F5A623",
+    track: P.warning,
   },
   in_progress: {
     label: "চলমান",
-    bg: "#E3F2FD",
-    border: "#1E88E5",
+    color: P.info,
+    soft: P.infoSoft,
     icon: "boat-outline",
-    textColor: "#1E88E5",
+    track: P.info,
   },
   completed: {
     label: "সম্পন্ন",
-    bg: "#E8F5E9",
-    border: "#43A047",
+    color: P.success,
+    soft: P.successSoft,
     icon: "checkmark-circle-outline",
-    textColor: "#43A047",
+    track: P.success,
   },
   has_due: {
     label: "বাকি আছে",
-    bg: "#FFF3E0",
-    border: "#FB8C00",
+    color: P.danger,
+    soft: P.dangerSoft,
     icon: "alert-circle-outline",
-    textColor: "#FB8C00",
+    track: P.danger,
   },
 };
 
-// ── Single batch card ───────────────────────────────────
+const DEFAULT_STATUS = {
+  label: "অজানা",
+  color: P.textMuted,
+  soft: "rgba(255,255,255,0.06)",
+  icon: "help-circle-outline",
+  track: P.textMuted,
+};
+
+const getSafeStatus = (s: string) =>
+  (STATUS_CONFIG as any)[s] ?? DEFAULT_STATUS;
+
+// ─── Pona chips config ─────────────────────────────────────────────────────────
+const PONA_CHIPS = [
+  { key: "Golda", label: "গলদা", color: P.gold, soft: P.goldSoft },
+  { key: "Bagda", label: "বাগদা", color: P.info, soft: P.infoSoft },
+  { key: "Vannamei", label: "ভেনামি", color: P.teal, soft: P.tealSoft },
+] as const;
+
+// ─── Compact Batch Card ────────────────────────────────────────────────────────
 const BatchCard = ({
   batch,
   onPress,
+  index,
 }: {
   batch: Batch;
   onPress: () => void;
+  index: number;
 }) => {
-  const cfg = STATUS_CONFIG[batch.status];
-  const total = batch.batchOrders?.length || 0;
+  const cfg = getSafeStatus(batch.status);
+  const total = batch.batchOrders?.length ?? 0;
   const delivered =
-    batch.batchOrders?.filter((o) => o.deliveryStatus === "delivered").length ||
+    batch.batchOrders?.filter((o) => o.deliveryStatus === "delivered").length ??
     0;
+  const pct = total > 0 ? delivered / total : 0;
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(14)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 280,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 280,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.card,
-        { backgroundColor: cfg.bg, borderColor: cfg.border },
-      ]}
-      onPress={onPress}
-      activeOpacity={0.8}
+    <Animated.View
+      style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
     >
-      {/* Top row */}
-      <View style={styles.cardTop}>
-        <View>
-          <Text style={styles.cardBatchNum}>{batch.batchNumber}</Text>
-          <Text style={styles.cardDate}>{formatDate(batch.batchDate)}</Text>
-        </View>
-        <View
-          style={[styles.statusPill, { backgroundColor: cfg.border + "25" }]}
-        >
-          <Ionicons name={cfg.icon} size={13} color={cfg.textColor} />
-          <Text style={[styles.statusLabel, { color: cfg.textColor }]}>
-            {cfg.label}
-          </Text>
-        </View>
-      </View>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={onPress}
+        activeOpacity={0.82}
+      >
+        {/* Left accent stripe */}
+        <View style={[styles.accentStripe, { backgroundColor: cfg.color }]} />
 
-      {/* Progress bar */}
-      <View style={styles.progressBg}>
-        <View
-          style={[
-            styles.progressFill,
-            {
-              width: total > 0 ? `${(delivered / total) * 100}%` : "0%",
-              backgroundColor: cfg.border,
-            },
-          ]}
-        />
-      </View>
-      <Text style={styles.progressText}>
-        {delivered}/{total} ডেলিভারি সম্পন্ন
-      </Text>
-
-      {/* Pona summary */}
-      <View style={styles.ponaSummaryRow}>
-        {batch.totalOrderedGolda > 0 && (
-          <View style={[styles.ponaChip, { backgroundColor: "#F5A62320" }]}>
-            <Text style={[styles.ponaChipLabel, { color: "#F5A623" }]}>
-              গলদা
-            </Text>
-            <Text style={[styles.ponaChipVal, { color: "#F5A623" }]}>
-              {batch.totalDeliveredGolda}/{batch.totalOrderedGolda}
-            </Text>
-          </View>
-        )}
-        {batch.totalOrderedBagda > 0 && (
-          <View style={[styles.ponaChip, { backgroundColor: "#1E88E520" }]}>
-            <Text style={[styles.ponaChipLabel, { color: "#1E88E5" }]}>
-              বাগদা
-            </Text>
-            <Text style={[styles.ponaChipVal, { color: "#1E88E5" }]}>
-              {batch.totalDeliveredBagda}/{batch.totalOrderedBagda}
-            </Text>
-          </View>
-        )}
-        {batch.totalOrderedVannamei > 0 && (
-          <View style={[styles.ponaChip, { backgroundColor: "#43A04720" }]}>
-            <Text style={[styles.ponaChipLabel, { color: "#43A047" }]}>
-              ভেনামি
-            </Text>
-            <Text style={[styles.ponaChipVal, { color: "#43A047" }]}>
-              {batch.totalDeliveredVannamei}/{batch.totalOrderedVannamei}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Financial summary */}
-      <View style={styles.finRow}>
-        <View style={styles.finItem}>
-          <Text style={styles.finLabel}>প্রাপ্ত</Text>
-          <Text style={[styles.finVal, { color: COLORS.success }]}>
-            {formatCurrency(batch.totalCollected)}
-          </Text>
-        </View>
-        {batch.totalDue > 0 && (
-          <View style={[styles.finItem, styles.dueBadge]}>
-            <Ionicons name="alert-circle" size={13} color={COLORS.danger} />
-            <Text style={styles.finLabel}>বাকি</Text>
-            <Text style={[styles.finVal, { color: COLORS.danger }]}>
-              {formatCurrency(batch.totalDue)}
-            </Text>
-            {batch.duePendingCount > 0 && (
-              <View style={styles.dueCount}>
-                <Text style={styles.dueCountText}>
-                  {batch.duePendingCount} জন
+        <View style={styles.cardInner}>
+          {/* ── Row 1: batch number + status pill ── */}
+          <View style={styles.row1}>
+            <View style={styles.batchNumWrap}>
+              <Text style={styles.batchNum}>{batch.batchNumber}</Text>
+              <View style={styles.dateChip}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={10}
+                  color={P.textMuted}
+                />
+                <Text style={styles.dateText}>
+                  {formatDate(batch.batchDate)}
                 </Text>
               </View>
-            )}
+            </View>
+            <View style={[styles.statusPill, { backgroundColor: cfg.soft }]}>
+              <Ionicons name={cfg.icon} size={11} color={cfg.color} />
+              <Text style={[styles.statusLabel, { color: cfg.color }]}>
+                {cfg.label}
+              </Text>
+            </View>
           </View>
-        )}
-        <View style={styles.finItem}>
-          <Text style={styles.finLabel}>মোট অর্ডার</Text>
-          <Text style={styles.finVal}>{total} টি</Text>
+
+          {/* ── Row 2: progress bar ── */}
+          <View style={styles.progressRow}>
+            <View style={styles.progressBg}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${Math.min(pct * 100, 100)}%`,
+                    backgroundColor: cfg.color,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.progressLabel}>
+              {delivered}/{total}
+            </Text>
+          </View>
+
+          {/* ── Row 3: pona chips + financials ── */}
+          <View style={styles.row3}>
+            {/* Pona chips */}
+            <View style={styles.ponaRow}>
+              {PONA_CHIPS.map(({ key, label, color, soft }) => {
+                const ordered = (batch as any)[`totalOrdered${key}`] ?? 0;
+                const deld = (batch as any)[`totalDelivered${key}`] ?? 0;
+                if (ordered === 0) return null;
+                return (
+                  <View
+                    key={key}
+                    style={[
+                      styles.ponaChip,
+                      { backgroundColor: soft, borderColor: color + "44" },
+                    ]}
+                  >
+                    <Text style={[styles.ponaLabel, { color }]}>{label}</Text>
+                    <Text style={[styles.ponaVal, { color }]}>
+                      {deld}/{ordered}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Financial pills */}
+            <View style={styles.finRow}>
+              <View
+                style={[styles.finChip, { backgroundColor: P.successSoft }]}
+              >
+                <Ionicons
+                  name="arrow-down-circle-outline"
+                  size={11}
+                  color={P.success}
+                />
+                <Text style={[styles.finVal, { color: P.success }]}>
+                  {formatCurrency(batch.totalCollected)}
+                </Text>
+              </View>
+              {(batch.totalDue ?? 0) > 0 && (
+                <View
+                  style={[styles.finChip, { backgroundColor: P.dangerSoft }]}
+                >
+                  <Ionicons
+                    name="alert-circle-outline"
+                    size={11}
+                    color={P.danger}
+                  />
+                  <Text style={[styles.finVal, { color: P.danger }]}>
+                    {formatCurrency(batch.totalDue)}
+                  </Text>
+                  {(batch.duePendingCount ?? 0) > 0 && (
+                    <View style={styles.countBubble}>
+                      <Text style={styles.countBubbleText}>
+                        {batch.duePendingCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+
+        {/* Chevron */}
+        <View style={styles.chevronWrap}>
+          <Ionicons name="chevron-forward" size={14} color={P.textMuted} />
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
-// ── Screen ──────────────────────────────────────────────
+// ─── Screen ────────────────────────────────────────────────────────────────────
+const FILTERS: { key: BatchStatus | ""; label: string }[] = [
+  { key: "", label: "সব" },
+  { key: "pending", label: "অপেক্ষমান" },
+  { key: "in_progress", label: "চলমান" },
+  { key: "completed", label: "সম্পন্ন" },
+  { key: "has_due", label: "বাকি" },
+];
+
 export const BatchListScreen = () => {
   const navigation = useNavigation<any>();
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -191,9 +283,11 @@ export const BatchListScreen = () => {
         status: statusFilter || undefined,
         limit: 50,
       });
-      setBatches(res.data.data.data);
+      const raw = res?.data?.data?.data;
+      setBatches(Array.isArray(raw) ? raw : []);
     } catch (e) {
-      console.log(e);
+      console.error("fetchBatches error:", e);
+      setBatches([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -201,106 +295,108 @@ export const BatchListScreen = () => {
   }, [monthFilter, statusFilter]);
 
   useEffect(() => {
+    setLoading(true);
     fetchBatches();
   }, [monthFilter, statusFilter]);
 
-  const filters: { key: BatchStatus | ""; label: string }[] = [
-    { key: "", label: "সব" },
-    { key: "pending", label: "অপেক্ষমান" },
-    { key: "in_progress", label: "চলমান" },
-    { key: "completed", label: "সম্পন্ন" },
-    { key: "has_due", label: "বাকি" },
-  ];
+  const prevMonth = () =>
+    setMonthFilter(dayjs(monthFilter).subtract(1, "month").format("YYYY-MM"));
+  const nextMonth = () =>
+    setMonthFilter(dayjs(monthFilter).add(1, "month").format("YYYY-MM"));
 
   return (
     <View style={styles.container}>
-      {/* Month selector */}
-      <View style={styles.monthRow}>
+      {/* ── Month navigator ── */}
+      <View style={styles.monthBar}>
         <TouchableOpacity
-          onPress={() =>
-            setMonthFilter(
-              dayjs(monthFilter).subtract(1, "month").format("YYYY-MM"),
-            )
-          }
+          style={styles.monthArrow}
+          onPress={prevMonth}
+          activeOpacity={0.75}
         >
-          <Ionicons name="chevron-back" size={22} color={COLORS.primary} />
+          <Ionicons name="chevron-back" size={18} color={P.textSecondary} />
         </TouchableOpacity>
-        <Text style={styles.monthText}>
-          {dayjs(monthFilter).format("MMMM YYYY")}
-        </Text>
+
+        <View style={styles.monthCenter}>
+          <Ionicons name="calendar" size={13} color={P.accent} />
+          <Text style={styles.monthText}>
+            {dayjs(monthFilter).format("MMMM YYYY")}
+          </Text>
+        </View>
+
         <TouchableOpacity
-          onPress={() =>
-            setMonthFilter(dayjs(monthFilter).add(1, "month").format("YYYY-MM"))
-          }
+          style={styles.monthArrow}
+          onPress={nextMonth}
+          activeOpacity={0.75}
         >
-          <Ionicons name="chevron-forward" size={22} color={COLORS.primary} />
+          <Ionicons name="chevron-forward" size={18} color={P.textSecondary} />
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.monthReportBtn}
+          style={styles.reportBtn}
           onPress={() =>
             navigation.navigate("MonthlyBatchReport", { month: monthFilter })
           }
+          activeOpacity={0.85}
         >
-          <Ionicons name="bar-chart-outline" size={16} color={COLORS.white} />
-          <Text style={styles.monthReportBtnText}>রিপোর্ট</Text>
+          <Ionicons name="bar-chart-outline" size={13} color={P.white} />
+          <Text style={styles.reportBtnText}>রিপোর্ট</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Status filters */}
+      {/* ── Status filter chips ── */}
       <FlatList
         horizontal
-        data={filters}
-        keyExtractor={(i) => i.key}
+        data={FILTERS}
+        keyExtractor={(i) => i.key || "all"}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: 12,
-          gap: 8,
-          paddingBottom: 8,
-        }}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.filterBtn,
-              statusFilter === item.key && styles.filterBtnActive,
-            ]}
-            onPress={() => setStatusFilter(item.key)}
-          >
-            {item.key !== "" && (
-              <View
-                style={[
-                  styles.filterDot,
-                  {
-                    backgroundColor:
-                      STATUS_CONFIG[item.key as BatchStatus]?.border ||
-                      COLORS.primary,
-                  },
-                ]}
-              />
-            )}
-            <Text
+        contentContainerStyle={styles.filterList}
+        renderItem={({ item }) => {
+          const active = statusFilter === item.key;
+          const cfg = item.key ? getSafeStatus(item.key) : null;
+          return (
+            <TouchableOpacity
               style={[
-                styles.filterText,
-                statusFilter === item.key && styles.filterTextActive,
+                styles.filterChip,
+                active && {
+                  backgroundColor: cfg ? cfg.soft : P.accentSoft,
+                  borderColor: cfg ? cfg.color + "55" : P.accent + "55",
+                },
               ]}
+              onPress={() => setStatusFilter(item.key)}
+              activeOpacity={0.75}
             >
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        )}
+              {cfg && (
+                <View
+                  style={[styles.filterDot, { backgroundColor: cfg.color }]}
+                />
+              )}
+              <Text
+                style={[
+                  styles.filterChipText,
+                  active && { color: cfg ? cfg.color : P.accent },
+                ]}
+              >
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        }}
       />
 
+      {/* ── List ── */}
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <ActivityIndicator size="large" color={P.accent} />
+          <Text style={styles.loadingText}>লোড হচ্ছে…</Text>
         </View>
       ) : (
         <FlatList
           data={batches}
           keyExtractor={(b) => b.id}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <BatchCard
               batch={item}
+              index={index}
               onPress={() =>
                 navigation.navigate("BatchDetails", { batchId: item.id })
               }
@@ -313,124 +409,185 @@ export const BatchListScreen = () => {
                 setRefreshing(true);
                 fetchBatches();
               }}
-              colors={[COLORS.primary]}
+              colors={[P.accent]}
+              tintColor={P.accent}
             />
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons
-                name="boat-outline"
-                size={64}
-                color={COLORS.textMuted}
-              />
+              <View style={styles.emptyIconWrap}>
+                <Ionicons name="boat-outline" size={44} color={P.textMuted} />
+              </View>
               <Text style={styles.emptyTitle}>কোনো ব্যাচ নেই</Text>
-              <Text style={styles.emptySubtext}>নতুন ব্যাচ তৈরি করুন</Text>
+              <Text style={styles.emptySubtitle}>
+                নতুন ব্যাচ তৈরি করতে + চাপুন
+              </Text>
             </View>
           }
-          contentContainerStyle={{ padding: 12, gap: 10, flexGrow: 1 }}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
         />
       )}
 
-      {/* FAB */}
+      {/* ── FAB ── */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => navigation.navigate("CreateBatch")}
+        activeOpacity={0.88}
       >
-        <Ionicons name="add" size={30} color={COLORS.white} />
+        <Ionicons name="add" size={28} color={P.white} />
       </TouchableOpacity>
     </View>
   );
 };
 
+// ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  monthRow: {
+  container: { flex: 1, backgroundColor: P.bg },
+
+  // Month bar
+  monthBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: P.border,
+  },
+  monthArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: P.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: P.border,
+  },
+  monthCenter: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 12,
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    gap: 6,
   },
   monthText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "800",
-    color: COLORS.text,
-    flex: 1,
-    textAlign: "center",
+    color: P.textPrimary,
+    letterSpacing: -0.2,
   },
-  monthReportBtn: {
+  reportBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    gap: 5,
+    backgroundColor: P.accent,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
-  monthReportBtnText: { color: COLORS.white, fontWeight: "700", fontSize: 12 },
-  filterBtn: {
+  reportBtnText: { color: P.white, fontWeight: "700", fontSize: 12 },
+
+  // Filter chips
+  filterList: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 7,
+  },
+  filterChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: COLORS.white,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
+    backgroundColor: P.surface,
+    borderWidth: 1,
+    borderColor: P.border,
   },
-  filterBtnActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  filterDot: { width: 8, height: 8, borderRadius: 4 },
-  filterText: { fontSize: 12, fontWeight: "600", color: COLORS.textSecondary },
-  filterTextActive: { color: COLORS.white },
+  filterDot: { width: 7, height: 7, borderRadius: 4 },
+  filterChipText: { fontSize: 12, fontWeight: "600", color: P.textSecondary },
 
-  // card
+  // Card — compact
   card: {
+    flexDirection: "row",
+    backgroundColor: P.surface,
     borderRadius: 14,
-    borderWidth: 2,
-    padding: 14,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: P.border,
+    overflow: "hidden",
+    marginBottom: 9,
   },
-  cardTop: {
+  accentStripe: { width: 4 },
+  cardInner: { flex: 1, paddingHorizontal: 12, paddingVertical: 11 },
+  chevronWrap: { justifyContent: "center", paddingRight: 10, paddingLeft: 2 },
+
+  // Row 1
+  row1: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 10,
+    alignItems: "center",
+    marginBottom: 8,
   },
-  cardBatchNum: { fontSize: 16, fontWeight: "900", color: COLORS.text },
-  cardDate: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
+  batchNumWrap: { gap: 2 },
+  batchNum: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: P.textPrimary,
+    letterSpacing: -0.2,
+  },
+  dateChip: { flexDirection: "row", alignItems: "center", gap: 3 },
+  dateText: { fontSize: 10, color: P.textMuted },
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 20,
   },
-  statusLabel: { fontSize: 11, fontWeight: "700" },
-  progressBg: {
-    height: 6,
-    backgroundColor: COLORS.border,
-    borderRadius: 3,
-    marginBottom: 4,
-  },
-  progressFill: { height: 6, borderRadius: 3 },
-  progressText: { fontSize: 11, color: COLORS.textSecondary, marginBottom: 10 },
+  statusLabel: { fontSize: 10, fontWeight: "700" },
 
-  ponaSummaryRow: { flexDirection: "row", gap: 6, marginBottom: 10 },
+  // Row 2: progress
+  progressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  progressBg: {
+    flex: 1,
+    height: 4,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  progressFill: { height: 4, borderRadius: 2 },
+  progressLabel: { fontSize: 10, color: P.textMuted, minWidth: 28 },
+
+  // Row 3
+  row3: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+  ponaRow: { flexDirection: "row", gap: 5, flexWrap: "wrap" },
   ponaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  ponaLabel: { fontSize: 10, fontWeight: "600" },
+  ponaVal: { fontSize: 11, fontWeight: "800" },
+
+  finRow: { flexDirection: "row", gap: 5, alignItems: "center" },
+  finChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -438,52 +595,62 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 8,
   },
-  ponaChipLabel: { fontSize: 11, fontWeight: "600" },
-  ponaChipVal: { fontSize: 12, fontWeight: "800" },
-
-  finRow: { flexDirection: "row", gap: 8 },
-  finItem: { flex: 1, alignItems: "center" },
-  dueBadge: {
-    backgroundColor: COLORS.dangerLight,
+  finVal: { fontSize: 11, fontWeight: "700" },
+  countBubble: {
+    backgroundColor: P.danger,
     borderRadius: 8,
-    padding: 4,
-    position: "relative",
-  },
-  finLabel: { fontSize: 11, color: COLORS.textSecondary },
-  finVal: { fontSize: 14, fontWeight: "800", color: COLORS.text },
-  dueCount: {
-    backgroundColor: COLORS.danger,
-    borderRadius: 10,
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 1,
-    marginTop: 2,
+    marginLeft: 2,
   },
-  dueCountText: { color: COLORS.white, fontSize: 10, fontWeight: "700" },
+  countBubbleText: { color: P.white, fontSize: 9, fontWeight: "800" },
 
+  // States
+  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  loadingText: { color: P.textMuted, fontSize: 13 },
   empty: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
     paddingTop: 80,
+    gap: 10,
   },
-  emptyTitle: { fontSize: 16, fontWeight: "700", color: COLORS.textSecondary },
-  emptySubtext: { fontSize: 13, color: COLORS.textMuted },
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    backgroundColor: P.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: P.border,
+    marginBottom: 4,
+  },
+  emptyTitle: { fontSize: 16, fontWeight: "700", color: P.textPrimary },
+  emptySubtitle: {
+    fontSize: 13,
+    color: P.textMuted,
+    textAlign: "center",
+    paddingHorizontal: 40,
+  },
 
+  listContent: { padding: 14, paddingBottom: 90, flexGrow: 1 },
+
+  // FAB
   fab: {
     position: "absolute",
-    bottom: 20,
+    bottom: 22,
     right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: COLORS.primary,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: P.accent,
     alignItems: "center",
     justifyContent: "center",
     elevation: 8,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowColor: P.accent,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
   },
 });
