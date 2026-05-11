@@ -1,9 +1,9 @@
 // src/store/authStore.ts
-import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User } from '../types';
-import { STORAGE_KEYS } from '../constants';
-import { authAPI } from '../api/services';
+import { create } from "zustand";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { User } from "../types";
+import { STORAGE_KEYS } from "../constants";
+import { authAPI } from "../api/services";
 
 interface AuthState {
   token: string | null;
@@ -41,8 +41,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  login: async (email, password) => {
-    const res = await authAPI.login(email, password);
+  login: async (identifier, password) => {
+    const res = await authAPI.login(identifier, password);
     const { token, user } = res.data.data;
     await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
     await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));

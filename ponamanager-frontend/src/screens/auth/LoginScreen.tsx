@@ -27,7 +27,7 @@ export const LoginScreen = () => {
 
   const handleLogin = async () => {
     if (!identifier || !password) {
-      Alert.alert("Error", "Please enter email and password");
+      Alert.alert("Error", "Please enter email/phone number and password");
       return;
     }
     setLoading(true);
@@ -64,7 +64,7 @@ export const LoginScreen = () => {
           <Text style={styles.formTitle}>Login</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>Email/Phone</Text>
             <View style={styles.inputWrapper}>
               <Ionicons
                 name="mail-outline"
@@ -74,7 +74,7 @@ export const LoginScreen = () => {
               />
               <TextInput
                 style={styles.input}
-                placeholder="Enter email"
+                placeholder="Enter email or phone number"
                 value={identifier}
                 onChangeText={setIdentifier}
                 keyboardType="email-phone"
