@@ -10,6 +10,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Animated,
+  useColorScheme,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -17,8 +18,31 @@ import { customerAPI } from "../../api/services";
 import { Customer } from "../../types";
 import { formatCurrency } from "../../utils/helpers";
 
-// ─── Design tokens (matches OrderListScreen palette) ──────────────────────────
-const PALETTE = {
+// ─── Theme: always light by default; gracefully adapts if system is dark ───────
+const LIGHT = {
+  bg: "#F5F6FA",
+  surface: "#FFFFFF",
+  surfaceRaised: "#FAFBFF",
+  border: "rgba(0,0,0,0.07)",
+  accent: "#6C63FF",
+  accentSoft: "rgba(108,99,255,0.10)",
+  danger: "#F03F5F",
+  dangerSoft: "rgba(240,63,95,0.09)",
+  success: "#18B565",
+  successSoft: "rgba(24,181,101,0.10)",
+  warning: "#E09400",
+  warningSoft: "rgba(224,148,0,0.10)",
+  teal: "#00A896",
+  tealSoft: "rgba(0,168,150,0.10)",
+  textPrimary: "#111827",
+  textSecondary: "#6B7280",
+  textMuted: "#9CA3AF",
+  white: "#FFFFFF",
+  shadow: "rgba(0,0,0,0.06)",
+};
+
+// Minimal dark fallback — only used when system forces dark mode
+const DARK = {
   bg: "#0F1117",
   surface: "#1A1D27",
   surfaceRaised: "#21253A",
@@ -37,31 +61,42 @@ const PALETTE = {
   textSecondary: "#8A8FA8",
   textMuted: "#545872",
   white: "#FFFFFF",
+  shadow: "rgba(0,0,0,0.30)",
 };
 
-// Deterministic avatar color per initial letter
+// Hook — always returns LIGHT unless the device OS theme is dark
+const usePalette = () => {
+  const scheme = useColorScheme();
+  return scheme === "dark" ? DARK : LIGHT;
+};
+
+// Deterministic avatar color per initial letter — vivid, works on both light & dark
 const AVATAR_COLORS = [
   "#6C63FF",
-  "#FF5E7E",
-  "#00C9A7",
-  "#F0A500",
+  "#F03F5F",
+  "#00A896",
+  "#E09400",
   "#3B82F6",
-  "#EC4899",
-  "#10B981",
-  "#F59E0B",
+  "#D946A8",
+  "#18B565",
+  "#E07B39",
 ];
 const getAvatarColor = (name: string) =>
   AVATAR_COLORS[(name.charCodeAt(0) ?? 65) % AVATAR_COLORS.length];
 
 // ─── Customer Card ─────────────────────────────────────────────────────────────
+type Palette = typeof LIGHT;
+
 const CustomerItem = ({
   customer,
   onPress,
   index,
+  P,
 }: {
   customer: Customer;
   onPress: () => void;
   index: number;
+  P: Palette;
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(18)).current;
@@ -93,7 +128,14 @@ const CustomerItem = ({
       style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
     >
       <TouchableOpacity
-        style={styles.card}
+        style={[
+          styles.card,
+          {
+            backgroundColor: P.surface,
+            borderColor: P.border,
+            shadowColor: P.shadow,
+          },
+        ]}
         onPress={onPress}
         activeOpacity={0.82}
       >
@@ -101,7 +143,7 @@ const CustomerItem = ({
         <View style={[styles.accentStripe, { backgroundColor: avatarColor }]} />
 
         {/* Avatar */}
-        <View style={[styles.avatar, { backgroundColor: avatarColor + "22" }]}>
+        <View style={[styles.avatar, { backgroundColor: avatarColor + "18" }]}>
           <Text style={[styles.avatarText, { color: avatarColor }]}>
             {initial}
           </Text>
@@ -111,24 +153,34 @@ const CustomerItem = ({
         <View style={styles.cardContent}>
           {/* Top row */}
           <View style={styles.topRow}>
-            <Text style={styles.customerName} numberOfLines={1}>
+            <Text
+              style={[styles.customerName, { color: P.textPrimary }]}
+              numberOfLines={1}
+            >
               {customer.name}
             </Text>
             <View style={styles.badgeRow}>
               {customer.hasRunningOrder && (
-                <View style={styles.runningBadge}>
-                  <View style={styles.runningDot} />
-                  <Text style={styles.runningText}>Active</Text>
+                <View
+                  style={[
+                    styles.runningBadge,
+                    { backgroundColor: P.successSoft },
+                  ]}
+                >
+                  <View
+                    style={[styles.runningDot, { backgroundColor: P.success }]}
+                  />
+                  <Text style={[styles.runningText, { color: P.success }]}>
+                    Active
+                  </Text>
                 </View>
               )}
               {hasDue && (
-                <View style={styles.dueBadge}>
-                  <Ionicons
-                    name="alert-circle"
-                    size={9}
-                    color={PALETTE.danger}
-                  />
-                  <Text style={styles.dueText}>Due</Text>
+                <View
+                  style={[styles.dueBadge, { backgroundColor: P.dangerSoft }]}
+                >
+                  <Ionicons name="alert-circle" size={9} color={P.danger} />
+                  <Text style={[styles.dueText, { color: P.danger }]}>Due</Text>
                 </View>
               )}
             </View>
@@ -136,19 +188,20 @@ const CustomerItem = ({
 
           {/* Mobile */}
           <View style={styles.infoRow}>
-            <Ionicons name="call-outline" size={11} color={PALETTE.textMuted} />
-            <Text style={styles.mobile}>{customer.mobile}</Text>
+            <Ionicons name="call-outline" size={11} color={P.textMuted} />
+            <Text style={[styles.mobile, { color: P.textSecondary }]}>
+              {customer.mobile}
+            </Text>
           </View>
 
           {/* Location */}
           {!!location && (
             <View style={styles.infoRow}>
-              <Ionicons
-                name="location-outline"
-                size={11}
-                color={PALETTE.textMuted}
-              />
-              <Text style={styles.area} numberOfLines={1}>
+              <Ionicons name="location-outline" size={11} color={P.textMuted} />
+              <Text
+                style={[styles.area, { color: P.textMuted }]}
+                numberOfLines={1}
+              >
                 {location}
               </Text>
             </View>
@@ -157,10 +210,12 @@ const CustomerItem = ({
           {/* Footer: due amount */}
           {hasDue && (
             <>
-              <View style={styles.divider} />
+              <View style={[styles.divider, { backgroundColor: P.border }]} />
               <View style={styles.dueRow}>
-                <Text style={styles.dueLabelText}>Outstanding Due</Text>
-                <Text style={styles.dueAmountText}>
+                <Text style={[styles.dueLabelText, { color: P.textMuted }]}>
+                  Outstanding Due
+                </Text>
+                <Text style={[styles.dueAmountText, { color: P.danger }]}>
                   {formatCurrency(customer.totalDue)}
                 </Text>
               </View>
@@ -170,11 +225,7 @@ const CustomerItem = ({
 
         {/* Chevron */}
         <View style={styles.chevronWrap}>
-          <Ionicons
-            name="chevron-forward"
-            size={15}
-            color={PALETTE.textMuted}
-          />
+          <Ionicons name="chevron-forward" size={15} color={P.textMuted} />
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -183,6 +234,7 @@ const CustomerItem = ({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export const CustomerListScreen = () => {
+  const P = usePalette();
   const navigation = useNavigation<any>();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,10 +253,8 @@ export const CustomerListScreen = () => {
           page: currentPage,
           limit: 20,
         });
-        // Guard against unexpected API shape
         const data = res?.data?.data;
         const rows: Customer[] = Array.isArray(data?.data) ? data.data : [];
-
         if (reset) {
           setCustomers(rows);
           setPage(2);
@@ -234,7 +284,6 @@ export const CustomerListScreen = () => {
     setRefreshing(true);
     fetchCustomers(true);
   };
-
   const onEndReached = () => {
     if (hasMore && !loadingMore) {
       setLoadingMore(true);
@@ -243,40 +292,47 @@ export const CustomerListScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: P.bg }]}>
       {/* ── Header ── */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Customers</Text>
-          <Text style={styles.headerSub}>
+          <Text style={[styles.headerTitle, { color: P.textPrimary }]}>
+            Customers
+          </Text>
+          <Text style={[styles.headerSub, { color: P.textMuted }]}>
             {customers.length}{" "}
             {customers.length === 1 ? "customer" : "customers"}
           </Text>
         </View>
         <TouchableOpacity
-          style={styles.addBtn}
+          style={[styles.addBtn, { backgroundColor: P.accent }]}
           onPress={() => navigation.navigate("AddEditCustomer")}
           activeOpacity={0.85}
         >
-          <Ionicons name="person-add-outline" size={17} color={PALETTE.white} />
+          <Ionicons name="person-add-outline" size={17} color={P.white} />
           <Text style={styles.addBtnText}>Add</Text>
         </TouchableOpacity>
       </View>
 
       {/* ── Search ── */}
-      <View style={styles.searchWrap}>
-        <Ionicons name="search" size={16} color={PALETTE.textMuted} />
+      <View
+        style={[
+          styles.searchWrap,
+          { backgroundColor: P.surface, borderColor: P.border },
+        ]}
+      >
+        <Ionicons name="search" size={16} color={P.textMuted} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: P.textPrimary }]}
           placeholder="Search by name or mobile…"
           value={search}
           onChangeText={setSearch}
-          placeholderTextColor={PALETTE.textMuted}
+          placeholderTextColor={P.textMuted}
           returnKeyType="search"
         />
         {search.length > 0 && (
           <TouchableOpacity onPress={() => setSearch("")}>
-            <Ionicons name="close-circle" size={16} color={PALETTE.textMuted} />
+            <Ionicons name="close-circle" size={16} color={P.textMuted} />
           </TouchableOpacity>
         )}
       </View>
@@ -284,8 +340,10 @@ export const CustomerListScreen = () => {
       {/* ── List ── */}
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={PALETTE.accent} />
-          <Text style={styles.loadingText}>Loading customers…</Text>
+          <ActivityIndicator size="large" color={P.accent} />
+          <Text style={[styles.loadingText, { color: P.textMuted }]}>
+            Loading customers…
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -295,6 +353,7 @@ export const CustomerListScreen = () => {
             <CustomerItem
               customer={item}
               index={index}
+              P={P}
               onPress={() =>
                 navigation.navigate("CustomerDetails", { customerId: item.id })
               }
@@ -304,8 +363,8 @@ export const CustomerListScreen = () => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={[PALETTE.accent]}
-              tintColor={PALETTE.accent}
+              colors={[P.accent]}
+              tintColor={P.accent}
             />
           }
           onEndReached={onEndReached}
@@ -313,21 +372,24 @@ export const CustomerListScreen = () => {
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color={PALETTE.accent} />
+                <ActivityIndicator size="small" color={P.accent} />
               </View>
             ) : null
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <View style={styles.emptyIconWrap}>
-                <Ionicons
-                  name="people-outline"
-                  size={44}
-                  color={PALETTE.textMuted}
-                />
+              <View
+                style={[
+                  styles.emptyIconWrap,
+                  { backgroundColor: P.surface, borderColor: P.border },
+                ]}
+              >
+                <Ionicons name="people-outline" size={44} color={P.textMuted} />
               </View>
-              <Text style={styles.emptyTitle}>No customers found</Text>
-              <Text style={styles.emptySubtitle}>
+              <Text style={[styles.emptyTitle, { color: P.textPrimary }]}>
+                No customers found
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: P.textMuted }]}>
                 {search
                   ? `No results for "${search}"`
                   : "Add your first customer to get started"}
@@ -342,9 +404,9 @@ export const CustomerListScreen = () => {
   );
 };
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles (color-neutral — all theme colors applied inline) ─────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: PALETTE.bg },
+  container: { flex: 1 },
 
   // Header
   header: {
@@ -355,23 +417,17 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 14,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: PALETTE.textPrimary,
-    letterSpacing: -0.5,
-  },
-  headerSub: { fontSize: 12, color: PALETTE.textMuted, marginTop: 2 },
+  headerTitle: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
+  headerSub: { fontSize: 12, marginTop: 2 },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: PALETTE.accent,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 9,
   },
-  addBtnText: { color: PALETTE.white, fontSize: 13, fontWeight: "700" },
+  addBtnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
 
   // Search
   searchWrap: {
@@ -380,30 +436,25 @@ const styles = StyleSheet.create({
     gap: 10,
     marginHorizontal: 16,
     marginBottom: 12,
-    backgroundColor: PALETTE.surface,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1.5,
-    borderColor: PALETTE.border,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: PALETTE.textPrimary,
-    paddingVertical: 0,
-  },
+  searchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
 
   // Card
   card: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: PALETTE.surface,
     borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: PALETTE.border,
     marginBottom: 10,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    elevation: 2,
   },
   accentStripe: { width: 4, alignSelf: "stretch" },
   avatar: {
@@ -428,71 +479,47 @@ const styles = StyleSheet.create({
     paddingRight: 4,
     marginBottom: 4,
   },
-  customerName: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: PALETTE.textPrimary,
-    flex: 1,
-    marginRight: 8,
-  },
+  customerName: { fontSize: 14, fontWeight: "700", flex: 1, marginRight: 8 },
   badgeRow: { flexDirection: "row", gap: 5, alignItems: "center" },
   runningBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: PALETTE.successSoft,
     borderRadius: 6,
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
-  runningDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: PALETTE.success,
-  },
-  runningText: { fontSize: 10, fontWeight: "700", color: PALETTE.success },
+  runningDot: { width: 6, height: 6, borderRadius: 3 },
+  runningText: { fontSize: 10, fontWeight: "700" },
   dueBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    backgroundColor: PALETTE.dangerSoft,
     borderRadius: 6,
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
-  dueText: { fontSize: 10, fontWeight: "700", color: PALETTE.danger },
+  dueText: { fontSize: 10, fontWeight: "700" },
 
   // Info rows
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginTop: 3,
-  },
-  mobile: { fontSize: 12, color: PALETTE.textSecondary },
-  area: { fontSize: 12, color: PALETTE.textMuted, flex: 1 },
+  infoRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
+  mobile: { fontSize: 12 },
+  area: { fontSize: 12, flex: 1 },
 
   // Due footer
-  divider: {
-    height: 1,
-    backgroundColor: PALETTE.border,
-    marginTop: 10,
-    marginBottom: 8,
-    marginRight: 8,
-  },
+  divider: { height: 1, marginTop: 10, marginBottom: 8, marginRight: 8 },
   dueRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingRight: 8,
   },
-  dueLabelText: { fontSize: 11, color: PALETTE.textMuted },
-  dueAmountText: { fontSize: 14, fontWeight: "800", color: PALETTE.danger },
+  dueLabelText: { fontSize: 11 },
+  dueAmountText: { fontSize: 14, fontWeight: "800" },
 
   // States
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  loadingText: { color: PALETTE.textMuted, fontSize: 13 },
+  loadingText: { fontSize: 13 },
   footerLoader: { paddingVertical: 20, alignItems: "center" },
   empty: {
     flex: 1,
@@ -505,20 +532,13 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 24,
-    backgroundColor: PALETTE.surface,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: PALETTE.border,
     marginBottom: 4,
   },
-  emptyTitle: { fontSize: 16, fontWeight: "700", color: PALETTE.textPrimary },
-  emptySubtitle: {
-    fontSize: 13,
-    color: PALETTE.textMuted,
-    textAlign: "center",
-    paddingHorizontal: 40,
-  },
+  emptyTitle: { fontSize: 16, fontWeight: "700" },
+  emptySubtitle: { fontSize: 13, textAlign: "center", paddingHorizontal: 40 },
 
   listContent: { padding: 16, flexGrow: 1 },
 });
