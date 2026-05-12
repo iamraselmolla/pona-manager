@@ -9,17 +9,68 @@ import {
   ActivityIndicator,
   Alert,
   StatusBar,
+  useColorScheme,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { customerAPI } from "../../api/services";
 import { Customer, Order, Payment } from "../../types";
-import { COLORS, ORDER_STATUS } from "../../constants";
+import { ORDER_STATUS } from "../../constants";
 import { formatCurrency, formatDate } from "../../utils/helpers";
 
-// ─── Avatar ───────────────────────────────────────────────────────────────────
+// ─── Palettes ──────────────────────────────────────────────────────────────────
+const LIGHT = {
+  bg: "#F4F5F9",
+  surface: "#FFFFFF",
+  border: "rgba(0,0,0,0.07)",
+  textPrimary: "#111827",
+  textSecondary: "#6B7280",
+  textMuted: "#9CA3AF",
+  accent: "#6C63FF",
+  danger: "#F03F5F",
+  dangerSoft: "rgba(240,63,95,0.09)",
+  success: "#18B565",
+  successSoft: "rgba(24,181,101,0.10)",
+  heroGradient: ["#6C63FF", "#9D5CFF", "#C26EFF"] as [string, string, string],
+  heroStatusBar: "light-content" as "light-content" | "dark-content",
+  orderIconBg: "#EEECFF",
+  orderIconColor: "#6C63FF",
+  payIconBg: "#E1F5EE",
+  payIconColor: "#18B565",
+  tabActiveBg: "#6C63FF",
+  btnPrimaryBg: "#6C63FF",
+  duePillBg: "#FCEBEB",
+  duePillText: "#A32D2D",
+};
 
+const DARK = {
+  bg: "#0F1117",
+  surface: "#1A1D27",
+  border: "rgba(255,255,255,0.07)",
+  textPrimary: "#F0F2FF",
+  textSecondary: "#8A8FA8",
+  textMuted: "#545872",
+  accent: "#6C63FF",
+  danger: "#FF5E7E",
+  dangerSoft: "rgba(255,94,126,0.12)",
+  success: "#2ECC71",
+  successSoft: "rgba(46,204,113,0.12)",
+  heroGradient: ["#1A1D27", "#21253A", "#2A2F47"] as [string, string, string],
+  heroStatusBar: "light-content" as "light-content" | "dark-content",
+  orderIconBg: "rgba(108,99,255,0.15)",
+  orderIconColor: "#6C63FF",
+  payIconBg: "rgba(46,204,113,0.12)",
+  payIconColor: "#2ECC71",
+  tabActiveBg: "#6C63FF",
+  btnPrimaryBg: "#6C63FF",
+  duePillBg: "rgba(255,94,126,0.12)",
+  duePillText: "#FF5E7E",
+};
+
+const useTheme = () => (useColorScheme() === "dark" ? DARK : LIGHT);
+
+// ─── Avatar ────────────────────────────────────────────────────────────────────
 const Avatar = ({ name }: { name: string }) => (
   <View style={styles.avatarRing}>
     <View style={styles.avatarInner}>
@@ -28,8 +79,7 @@ const Avatar = ({ name }: { name: string }) => (
   </View>
 );
 
-// ─── Stat item inside the hero shelf ──────────────────────────────────────────
-
+// ─── Stat item ─────────────────────────────────────────────────────────────────
 const StatItem = ({
   label,
   value,
@@ -47,8 +97,7 @@ const StatItem = ({
   </View>
 );
 
-// ─── Icon box used in order / payment cards ────────────────────────────────────
-
+// ─── Icon box ──────────────────────────────────────────────────────────────────
 const IconBox = ({
   name,
   bg,
@@ -63,14 +112,11 @@ const IconBox = ({
   </View>
 );
 
-// ─── Status badge ─────────────────────────────────────────────────────────────
-
+// ─── Status badge ──────────────────────────────────────────────────────────────
 const StatusBadge = ({ status }: { status: string }) => {
-  const info = ORDER_STATUS[status] ?? {
-    label: status,
-    bg: "#EEE",
-    color: "#555",
-  };
+  const info = (
+    ORDER_STATUS as Record<string, { label: string; bg: string; color: string }>
+  )[status] ?? { label: status, bg: "#EEE", color: "#555" };
   return (
     <View style={[styles.badge, { backgroundColor: info.bg }]}>
       <Text style={[styles.badgeText, { color: info.color }]}>
@@ -80,9 +126,9 @@ const StatusBadge = ({ status }: { status: string }) => {
   );
 };
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
-
+// ─── Main Screen ───────────────────────────────────────────────────────────────
 export const CustomerDetailsScreen = () => {
+  const T = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { customerId } = route.params;
@@ -102,8 +148,12 @@ export const CustomerDetailsScreen = () => {
           customerAPI.getPayments(customerId),
         ]);
         setCustomer(custRes.data.data);
-        setOrders(ordersRes.data.data);
-        setPayments(paymentsRes.data.data);
+        setOrders(
+          Array.isArray(ordersRes.data.data) ? ordersRes.data.data : [],
+        );
+        setPayments(
+          Array.isArray(paymentsRes.data.data) ? paymentsRes.data.data : [],
+        );
       } catch {
         Alert.alert("Error", "Failed to load customer");
       } finally {
@@ -115,8 +165,8 @@ export const CustomerDetailsScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={[styles.center, { backgroundColor: T.bg }]}>
+        <ActivityIndicator size="large" color={T.accent} />
       </View>
     );
   }
@@ -124,18 +174,17 @@ export const CustomerDetailsScreen = () => {
   if (!customer) return null;
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#0C447C" />
+    <View style={[styles.root, { backgroundColor: T.bg }]}>
+      <StatusBar barStyle={T.heroStatusBar} />
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* ── Hero ── */}
         <LinearGradient
-          colors={["#0C447C", "#185FA5", "#378ADD"]}
+          colors={T.heroGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.hero}
         >
-          {/* Decorative circles */}
           <View style={styles.decCircleLarge} />
           <View style={styles.decCircleSmall} />
 
@@ -156,7 +205,6 @@ export const CustomerDetailsScreen = () => {
           {/* Profile row */}
           <View style={styles.profileRow}>
             <Avatar name={customer.name} />
-
             <View style={styles.profileInfo}>
               <Text style={styles.custName} numberOfLines={1}>
                 {customer.name}
@@ -183,7 +231,6 @@ export const CustomerDetailsScreen = () => {
                 </View>
               ) : null}
             </View>
-
             <TouchableOpacity
               style={styles.editIcon}
               onPress={() =>
@@ -194,7 +241,7 @@ export const CustomerDetailsScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Stats shelf — fused into the bottom of the hero */}
+          {/* Stats shelf */}
           <View style={styles.statsShelf}>
             <StatItem
               label="Orders"
@@ -225,7 +272,7 @@ export const CustomerDetailsScreen = () => {
           {/* Action buttons */}
           <View style={styles.actionRow}>
             <TouchableOpacity
-              style={styles.btnPrimary}
+              style={[styles.btnPrimary, { backgroundColor: T.btnPrimaryBg }]}
               activeOpacity={0.85}
               onPress={() => navigation.navigate("CreateOrder", { customerId })}
             >
@@ -234,27 +281,44 @@ export const CustomerDetailsScreen = () => {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.btnSecondary}
+              style={[
+                styles.btnSecondary,
+                { backgroundColor: T.surface, borderColor: T.border },
+              ]}
               activeOpacity={0.85}
               onPress={() => navigation.navigate("AddPayment", { customerId })}
             >
-              <Ionicons name="cash-outline" size={17} color={COLORS.text} />
-              <Text style={styles.btnSecondaryText}>Add Payment</Text>
+              <Ionicons name="cash-outline" size={17} color={T.textPrimary} />
+              <Text style={[styles.btnSecondaryText, { color: T.textPrimary }]}>
+                Add Payment
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* Tabs */}
-          <View style={styles.tabsWrap}>
+          <View
+            style={[
+              styles.tabsWrap,
+              { backgroundColor: T.surface, borderColor: T.border },
+            ]}
+          >
             {(["orders", "payments"] as const).map((t) => (
               <TouchableOpacity
                 key={t}
-                style={[styles.tabBtn, tab === t && styles.tabBtnActive]}
+                style={[
+                  styles.tabBtn,
+                  tab === t && [
+                    styles.tabBtnActive,
+                    { backgroundColor: T.tabActiveBg },
+                  ],
+                ]}
                 onPress={() => setTab(t)}
                 activeOpacity={0.8}
               >
                 <Text
                   style={[
                     styles.tabBtnText,
+                    { color: T.textSecondary },
                     tab === t && styles.tabBtnTextActive,
                   ]}
                 >
@@ -266,53 +330,85 @@ export const CustomerDetailsScreen = () => {
             ))}
           </View>
 
-          {/* ── Orders list ── */}
+          {/* ── Orders ── */}
           {tab === "orders" && (
             <View style={styles.list}>
               {orders.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Ionicons
-                    name="receipt-outline"
-                    size={36}
-                    color={COLORS.textMuted}
-                  />
-                  <Text style={styles.emptyText}>No orders yet</Text>
+                  <View
+                    style={[
+                      styles.emptyIconWrap,
+                      { backgroundColor: T.surface, borderColor: T.border },
+                    ]}
+                  >
+                    <Ionicons
+                      name="receipt-outline"
+                      size={36}
+                      color={T.textMuted}
+                    />
+                  </View>
+                  <Text style={[styles.emptyText, { color: T.textMuted }]}>
+                    No orders yet
+                  </Text>
                 </View>
               ) : (
                 orders.map((order) => (
                   <TouchableOpacity
                     key={order.id}
-                    style={styles.orderCard}
+                    style={[
+                      styles.orderCard,
+                      { backgroundColor: T.surface, borderColor: T.border },
+                    ]}
                     activeOpacity={0.8}
                     onPress={() =>
                       navigation.navigate("OrderDetails", { orderId: order.id })
                     }
                   >
-                    <IconBox name="cube-outline" bg="#E6F1FB" color="#185FA5" />
-
+                    <IconBox
+                      name="cube-outline"
+                      bg={T.orderIconBg}
+                      color={T.orderIconColor}
+                    />
                     <View style={styles.cardBody}>
-                      {/* type + amount */}
                       <View style={styles.cardTopRow}>
-                        <Text style={styles.orderType}>{order.ponaType}</Text>
-                        <Text style={styles.orderAmount}>
+                        <Text
+                          style={[styles.orderType, { color: T.textPrimary }]}
+                        >
+                          {order.ponaType}
+                        </Text>
+                        <Text
+                          style={[styles.orderAmount, { color: T.textPrimary }]}
+                        >
                           {formatCurrency(order.totalPrice)}
                         </Text>
                       </View>
-                      {/* qty + date */}
                       <View style={styles.cardMetaRow}>
-                        <Text style={styles.orderQty}>
-                          {order.plQuantity.toLocaleString()} PL
+                        <Text
+                          style={[styles.orderQty, { color: T.textSecondary }]}
+                        >
+                          {(order.plQuantity ?? 0).toLocaleString()} PL
                         </Text>
-                        <Text style={styles.orderDate}>
+                        <Text
+                          style={[styles.orderDate, { color: T.textMuted }]}
+                        >
                           {formatDate(order.deliveryDate)}
                         </Text>
                       </View>
-                      {/* status badge + due pill */}
                       <View style={styles.cardFootRow}>
                         <StatusBadge status={order.status} />
-                        {order.dueAmount > 0 && (
-                          <View style={styles.duePill}>
-                            <Text style={styles.duePillText}>
+                        {(order.dueAmount ?? 0) > 0 && (
+                          <View
+                            style={[
+                              styles.duePill,
+                              { backgroundColor: T.duePillBg },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.duePillText,
+                                { color: T.duePillText },
+                              ]}
+                            >
                               Due: {formatCurrency(order.dueAmount)}
                             </Text>
                           </View>
@@ -325,38 +421,66 @@ export const CustomerDetailsScreen = () => {
             </View>
           )}
 
-          {/* ── Payments list ── */}
+          {/* ── Payments ── */}
           {tab === "payments" && (
             <View style={styles.list}>
               {payments.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Ionicons
-                    name="wallet-outline"
-                    size={36}
-                    color={COLORS.textMuted}
-                  />
-                  <Text style={styles.emptyText}>No payments yet</Text>
+                  <View
+                    style={[
+                      styles.emptyIconWrap,
+                      { backgroundColor: T.surface, borderColor: T.border },
+                    ]}
+                  >
+                    <Ionicons
+                      name="wallet-outline"
+                      size={36}
+                      color={T.textMuted}
+                    />
+                  </View>
+                  <Text style={[styles.emptyText, { color: T.textMuted }]}>
+                    No payments yet
+                  </Text>
                 </View>
               ) : (
                 payments.map((payment) => (
-                  <View key={payment.id} style={styles.paymentCard}>
-                    <IconBox name="cash-outline" bg="#E1F5EE" color="#0F6E56" />
+                  <View
+                    key={payment.id}
+                    style={[
+                      styles.paymentCard,
+                      { backgroundColor: T.surface, borderColor: T.border },
+                    ]}
+                  >
+                    <IconBox
+                      name="cash-outline"
+                      bg={T.payIconBg}
+                      color={T.payIconColor}
+                    />
                     <View style={styles.cardBody}>
                       <View style={styles.cardTopRow}>
-                        <Text style={styles.payAmount}>
+                        <Text style={[styles.payAmount, { color: T.success }]}>
                           {formatCurrency(payment.amount)}
                         </Text>
                         {(payment as any).method ? (
-                          <Text style={styles.payMethod}>
+                          <Text
+                            style={[
+                              styles.payMethod,
+                              { color: T.textSecondary },
+                            ]}
+                          >
                             {(payment as any).method}
                           </Text>
                         ) : null}
                       </View>
-                      <Text style={styles.payDate}>
+                      <Text style={[styles.payDate, { color: T.textMuted }]}>
                         {formatDate(payment.date)}
                       </Text>
                       {payment.notes ? (
-                        <Text style={styles.payNote}>{payment.notes}</Text>
+                        <Text
+                          style={[styles.payNote, { color: T.textSecondary }]}
+                        >
+                          {payment.notes}
+                        </Text>
                       ) : null}
                     </View>
                   </View>
@@ -372,14 +496,13 @@ export const CustomerDetailsScreen = () => {
   );
 };
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
+// ─── Styles (color-neutral) ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background },
+  root: { flex: 1 },
   scroll: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
 
-  // ── Hero ──
+  // Hero
   hero: {
     paddingHorizontal: 20,
     paddingTop: 16,
@@ -405,7 +528,7 @@ const styles = StyleSheet.create({
     left: -20,
   },
 
-  // ── Nav bar ──
+  // Nav
   navBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -427,7 +550,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
 
-  // ── Profile row ──
+  // Profile row
   profileRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -491,7 +614,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
 
-  // ── Stats shelf ──
+  // Stats shelf
   statsShelf: {
     flexDirection: "row",
     marginHorizontal: -20,
@@ -509,12 +632,7 @@ const styles = StyleSheet.create({
     borderRightWidth: 0.5,
     borderRightColor: "rgba(255,255,255,0.12)",
   },
-  statNum: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#fff",
-    lineHeight: 18,
-  },
+  statNum: { fontSize: 14, fontWeight: "600", color: "#fff", lineHeight: 18 },
   statLbl: {
     fontSize: 9,
     color: "rgba(255,255,255,0.55)",
@@ -525,22 +643,17 @@ const styles = StyleSheet.create({
   statSuccess: { color: "#9FE1CB" },
   statDanger: { color: "#F09595" },
 
-  // ── Body ──
+  // Body
   body: { paddingHorizontal: 16, paddingTop: 16 },
 
-  // ── Action buttons ──
-  actionRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 14,
-  },
+  // Action buttons
+  actionRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
   btnPrimary: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: "#185FA5",
     borderRadius: 12,
     paddingVertical: 13,
   },
@@ -551,25 +664,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: COLORS.white,
     borderRadius: 12,
     paddingVertical: 13,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
+    borderWidth: 1,
   },
-  btnSecondaryText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.text,
-  },
+  btnSecondaryText: { fontSize: 13, fontWeight: "600" },
 
-  // ── Tabs ──
+  // Tabs
   tabsWrap: {
     flexDirection: "row",
-    backgroundColor: COLORS.white,
     borderRadius: 12,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
+    borderWidth: 1,
     padding: 4,
     marginBottom: 14,
   },
@@ -579,36 +684,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 9,
   },
-  tabBtnActive: { backgroundColor: "#185FA5" },
-  tabBtnText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: COLORS.textSecondary,
-  },
-  tabBtnTextActive: { color: "#fff" },
+  tabBtnActive: {},
+  tabBtnText: { fontSize: 13, fontWeight: "500" },
+  tabBtnTextActive: { color: "#fff", fontWeight: "700" },
 
-  // ── Lists ──
+  // Lists
   list: { gap: 8 },
 
-  // ── Shared card layout ──
+  // Cards
   orderCard: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    backgroundColor: COLORS.white,
     borderRadius: 12,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
+    borderWidth: 1,
     padding: 14,
   },
   paymentCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: COLORS.white,
     borderRadius: 12,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
+    borderWidth: 1,
     padding: 14,
   },
   iconBox: {
@@ -639,41 +736,36 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
 
-  // ── Order card specifics ──
-  orderType: { fontSize: 13, fontWeight: "600", color: COLORS.text },
-  orderAmount: { fontSize: 14, fontWeight: "600", color: COLORS.text },
-  orderQty: { fontSize: 12, color: COLORS.textSecondary },
-  orderDate: { fontSize: 11, color: COLORS.textMuted },
+  // Order specifics
+  orderType: { fontSize: 13, fontWeight: "600" },
+  orderAmount: { fontSize: 14, fontWeight: "600" },
+  orderQty: { fontSize: 12 },
+  orderDate: { fontSize: 11 },
 
-  // ── Status badge ──
-  badge: {
-    borderRadius: 20,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-  },
+  // Badge
+  badge: { borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3 },
   badgeText: { fontSize: 10, fontWeight: "600" },
 
-  // ── Due pill ──
-  duePill: {
-    backgroundColor: "#FCEBEB",
-    borderRadius: 12,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-  },
-  duePillText: { fontSize: 11, color: "#A32D2D", fontWeight: "500" },
+  // Due pill
+  duePill: { borderRadius: 12, paddingHorizontal: 9, paddingVertical: 3 },
+  duePillText: { fontSize: 11, fontWeight: "500" },
 
-  // ── Payment card specifics ──
-  payAmount: { fontSize: 16, fontWeight: "600", color: "#0F6E56" },
-  payMethod: { fontSize: 11, color: COLORS.textSecondary },
-  payDate: { fontSize: 12, color: COLORS.textMuted, marginTop: 2 },
-  payNote: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    fontStyle: "italic",
-    marginTop: 2,
-  },
+  // Payment specifics
+  payAmount: { fontSize: 16, fontWeight: "600" },
+  payMethod: { fontSize: 11 },
+  payDate: { fontSize: 12, marginTop: 2 },
+  payNote: { fontSize: 12, fontStyle: "italic", marginTop: 2 },
 
-  // ── Empty state ──
+  // Empty state
   emptyState: { alignItems: "center", paddingVertical: 48, gap: 8 },
-  emptyText: { fontSize: 14, color: COLORS.textMuted },
+  emptyIconWrap: {
+    width: 70,
+    height: 70,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  emptyText: { fontSize: 14 },
 });

@@ -13,41 +13,90 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  useColorScheme,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { batchAPI } from "../../api/batchServices";
 import { Batch, BatchOrder } from "../../types";
-import { COLORS } from "../../constants";
 import {
   formatCurrency,
   formatDate,
   getPonaTypeColor,
 } from "../../utils/helpers";
 
-// ── Status config ────────────────────────────────────────
-const STATUS = {
+// ─── Palettes ──────────────────────────────────────────────────────────────────
+const LIGHT = {
+  bg: "#F4F5F9",
+  surface: "#FFFFFF",
+  border: "rgba(0,0,0,0.07)",
+  borderStrong: "rgba(0,0,0,0.12)",
+  textPrimary: "#111827",
+  textSecondary: "#6B7280",
+  textMuted: "#9CA3AF",
+  accent: "#6C63FF",
+  accentSoft: "rgba(108,99,255,0.10)",
+  danger: "#F03F5F",
+  dangerSoft: "rgba(240,63,95,0.09)",
+  success: "#18B565",
+  successSoft: "rgba(24,181,101,0.10)",
+  warning: "#E09400",
+  warningSoft: "rgba(224,148,0,0.10)",
+  info: "#0EA5E9",
+  infoSoft: "rgba(14,165,233,0.10)",
+  white: "#FFFFFF",
+  inputBg: "#F4F5F9",
+  shadow: "#000",
+};
+
+const DARK = {
+  bg: "#0F1117",
+  surface: "#1A1D27",
+  border: "rgba(255,255,255,0.07)",
+  borderStrong: "rgba(255,255,255,0.12)",
+  textPrimary: "#F0F2FF",
+  textSecondary: "#8A8FA8",
+  textMuted: "#545872",
+  accent: "#6C63FF",
+  accentSoft: "rgba(108,99,255,0.15)",
+  danger: "#FF5E7E",
+  dangerSoft: "rgba(255,94,126,0.12)",
+  success: "#2ECC71",
+  successSoft: "rgba(46,204,113,0.12)",
+  warning: "#F0A500",
+  warningSoft: "rgba(240,165,0,0.12)",
+  info: "#3B9EFF",
+  infoSoft: "rgba(59,158,255,0.12)",
+  white: "#FFFFFF",
+  inputBg: "#0F1117",
+  shadow: "#000",
+};
+
+const useTheme = () => (useColorScheme() === "dark" ? DARK : LIGHT);
+
+// ─── Status config ─────────────────────────────────────────────────────────────
+const getStatusConfig = (T: typeof LIGHT) => ({
   pending: {
     label: "পেন্ডিং",
-    color: "#F5A623",
-    bg: "#FFF8E1",
+    color: T.warning,
+    bg: T.warningSoft,
     icon: "time-outline" as const,
   },
   delivered: {
     label: "সম্পন্ন",
-    color: "#43A047",
-    bg: "#E8F5E9",
+    color: T.success,
+    bg: T.successSoft,
     icon: "checkmark-circle-outline" as const,
   },
   partial: {
     label: "আংশিক",
-    color: "#1E88E5",
-    bg: "#E3F2FD",
+    color: T.info,
+    bg: T.infoSoft,
     icon: "git-branch-outline" as const,
   },
-};
+});
 
-// ── Delivery Modal ───────────────────────────────────────
+// ─── Delivery Modal ────────────────────────────────────────────────────────────
 const DeliveryModal = ({
   visible,
   batchOrder,
@@ -61,6 +110,7 @@ const DeliveryModal = ({
   onSubmit: (data: any) => void;
   saving: boolean;
 }) => {
+  const T = useTheme();
   const [deliveredQty, setDeliveredQty] = useState("");
   const [deliveryRate, setDeliveryRate] = useState("");
   const [payment, setPayment] = useState("");
@@ -91,6 +141,7 @@ const DeliveryModal = ({
   const totalPaid = advance + paid;
   const dueAmt = Math.max(0, finalAmt - totalPaid);
   const isActuallyPartial = delivered < orderedQty && delivered > 0;
+  const typeColor = getPonaTypeColor(batchOrder.order.ponaType) ?? T.accent;
 
   const handleSubmit = () => {
     if (!deliveredQty || delivered <= 0) {
@@ -105,7 +156,6 @@ const DeliveryModal = ({
       Alert.alert("সতর্কতা", `সর্বোচ্চ ${orderedQty} PL`);
       return;
     }
-
     Alert.alert(
       isActuallyPartial ? "আংশিক ডেলিভারি" : "ডেলিভারি নিশ্চিত",
       isActuallyPartial
@@ -131,8 +181,6 @@ const DeliveryModal = ({
     );
   };
 
-  const typeColor = getPonaTypeColor(batchOrder.order.ponaType);
-
   return (
     <Modal
       visible={visible}
@@ -144,60 +192,115 @@ const DeliveryModal = ({
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={mStyles.container}>
+        <View style={[mStyles.container, { backgroundColor: T.bg }]}>
           {/* Header */}
-          <View style={mStyles.header}>
+          <View
+            style={[
+              mStyles.header,
+              { backgroundColor: T.surface, borderBottomColor: T.border },
+            ]}
+          >
             <View>
-              <Text style={mStyles.headerTitle}>ডেলিভারি এন্ট্রি</Text>
-              <Text style={mStyles.headerSub}>
+              <Text style={[mStyles.headerTitle, { color: T.textPrimary }]}>
+                ডেলিভারি এন্ট্রি
+              </Text>
+              <Text style={[mStyles.headerSub, { color: T.textSecondary }]}>
                 {batchOrder.order.customerName}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={mStyles.closeBtn}>
-              <Ionicons name="close" size={22} color={COLORS.text} />
+            <TouchableOpacity
+              onPress={onClose}
+              style={[mStyles.closeBtn, { backgroundColor: T.bg }]}
+            >
+              <Ionicons name="close" size={22} color={T.textPrimary} />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
             {/* Order info */}
-            <View style={[mStyles.infoCard, { borderTopColor: typeColor }]}>
-              <View style={mStyles.infoRow}>
-                <Text style={mStyles.infoLabel}>পোনার ধরন</Text>
+            <View
+              style={[
+                mStyles.infoCard,
+                { backgroundColor: T.surface, borderTopColor: typeColor },
+              ]}
+            >
+              {[
+                {
+                  label: "পোনার ধরন",
+                  value: null,
+                  pill: batchOrder.order.ponaType,
+                },
+                {
+                  label: "অর্ডার পরিমাণ",
+                  value: `${orderedQty.toLocaleString()} PL`,
+                  pill: null,
+                },
+                {
+                  label: "আগাম জমা",
+                  value: formatCurrency(advance),
+                  pill: null,
+                  valueColor: T.success,
+                },
+              ].map((row, i) => (
                 <View
-                  style={[
-                    mStyles.typePill,
-                    { backgroundColor: typeColor + "20" },
-                  ]}
+                  key={i}
+                  style={[mStyles.infoRow, { borderBottomColor: T.border }]}
                 >
-                  <Text style={[mStyles.typePillText, { color: typeColor }]}>
-                    {batchOrder.order.ponaType}
+                  <Text style={[mStyles.infoLabel, { color: T.textSecondary }]}>
+                    {row.label}
                   </Text>
+                  {row.pill ? (
+                    <View
+                      style={[
+                        mStyles.typePill,
+                        { backgroundColor: typeColor + "20" },
+                      ]}
+                    >
+                      <Text
+                        style={[mStyles.typePillText, { color: typeColor }]}
+                      >
+                        {row.pill}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text
+                      style={[
+                        mStyles.infoValue,
+                        { color: row.valueColor ?? T.textPrimary },
+                      ]}
+                    >
+                      {row.value}
+                    </Text>
+                  )}
                 </View>
-              </View>
-              <View style={mStyles.infoRow}>
-                <Text style={mStyles.infoLabel}>অর্ডার পরিমাণ</Text>
-                <Text style={mStyles.infoValue}>
-                  {orderedQty.toLocaleString()} PL
-                </Text>
-              </View>
-              <View style={mStyles.infoRow}>
-                <Text style={mStyles.infoLabel}>আগাম জমা</Text>
-                <Text style={[mStyles.infoValue, { color: COLORS.success }]}>
-                  {formatCurrency(advance)}
-                </Text>
-              </View>
+              ))}
             </View>
 
             {/* Partial toggle */}
-            <View style={mStyles.partialToggleCard}>
+            <View
+              style={[
+                mStyles.partialToggleCard,
+                { backgroundColor: T.surface },
+              ]}
+            >
               <View style={{ flex: 1 }}>
-                <Text style={mStyles.partialToggleTitle}>আংশিক ডেলিভারি?</Text>
-                <Text style={mStyles.partialToggleSub}>
+                <Text
+                  style={[mStyles.partialToggleTitle, { color: T.textPrimary }]}
+                >
+                  আংশিক ডেলিভারি?
+                </Text>
+                <Text
+                  style={[mStyles.partialToggleSub, { color: T.textSecondary }]}
+                >
                   পুরো পরিমাণ দিতে না পারলে
                 </Text>
               </View>
               <TouchableOpacity
-                style={[mStyles.toggleBtn, isPartial && mStyles.toggleBtnOn]}
+                style={[
+                  mStyles.toggleBtn,
+                  { backgroundColor: T.border },
+                  isPartial && { backgroundColor: T.info },
+                ]}
                 onPress={() => {
                   setIsPartial(!isPartial);
                   if (!isPartial) setDeliveredQty("");
@@ -213,11 +316,13 @@ const DeliveryModal = ({
               </TouchableOpacity>
             </View>
 
-            {/* Partial info banner */}
+            {/* Partial banner */}
             {isActuallyPartial && (
-              <View style={mStyles.partialBanner}>
-                <Ionicons name="information-circle" size={16} color="#1E88E5" />
-                <Text style={mStyles.partialBannerText}>
+              <View
+                style={[mStyles.partialBanner, { backgroundColor: T.infoSoft }]}
+              >
+                <Ionicons name="information-circle" size={16} color={T.info} />
+                <Text style={[mStyles.partialBannerText, { color: T.info }]}>
                   বাকি {remaining.toLocaleString()} PL স্বয়ংক্রিয়ভাবে নতুন
                   pending অর্ডার হিসেবে যোগ হবে
                 </Text>
@@ -225,43 +330,61 @@ const DeliveryModal = ({
             )}
 
             {/* Fields */}
-            <View style={mStyles.fieldsCard}>
+            <View style={[mStyles.fieldsCard, { backgroundColor: T.surface }]}>
               {/* Delivered qty */}
               <View style={mStyles.field}>
-                <Text style={mStyles.fieldLabel}>
+                <Text style={[mStyles.fieldLabel, { color: T.textSecondary }]}>
                   ডেলিভারিকৃত পরিমাণ
-                  {isPartial && (
-                    <Text style={{ color: COLORS.info }}> (আংশিক)</Text>
+                  {isPartial ? (
+                    <Text style={{ color: T.info }}> (আংশিক)</Text>
+                  ) : (
+                    ""
                   )}
                 </Text>
-                <View style={mStyles.inputRow}>
+                <View
+                  style={[
+                    mStyles.inputRow,
+                    { borderColor: T.border, backgroundColor: T.inputBg },
+                  ]}
+                >
                   <TextInput
-                    style={mStyles.input}
+                    style={[mStyles.input, { color: T.textPrimary }]}
                     value={deliveredQty}
                     onChangeText={setDeliveredQty}
                     keyboardType="numeric"
                     placeholder={`সর্বোচ্চ ${orderedQty.toLocaleString()}`}
-                    placeholderTextColor={COLORS.textMuted}
+                    placeholderTextColor={T.textMuted}
                   />
-                  <Text style={mStyles.inputSuffix}>PL</Text>
+                  <Text style={[mStyles.inputSuffix, { color: T.textMuted }]}>
+                    PL
+                  </Text>
                 </View>
-                {/* Progress bar */}
                 {delivered > 0 && (
                   <View style={mStyles.qtyProgress}>
-                    <View style={mStyles.qtyProgressBg}>
+                    <View
+                      style={[
+                        mStyles.qtyProgressBg,
+                        { backgroundColor: T.border },
+                      ]}
+                    >
                       <View
                         style={[
                           mStyles.qtyProgressFill,
                           {
                             width: `${Math.min((delivered / orderedQty) * 100, 100)}%`,
                             backgroundColor: isActuallyPartial
-                              ? "#1E88E5"
-                              : COLORS.success,
+                              ? T.info
+                              : T.success,
                           },
                         ]}
                       />
                     </View>
-                    <Text style={mStyles.qtyProgressText}>
+                    <Text
+                      style={[
+                        mStyles.qtyProgressText,
+                        { color: T.textSecondary },
+                      ]}
+                    >
                       {((delivered / orderedQty) * 100).toFixed(0)}%
                     </Text>
                   </View>
@@ -270,104 +393,135 @@ const DeliveryModal = ({
 
               {/* Rate */}
               <View style={mStyles.field}>
-                <Text style={mStyles.fieldLabel}>ডেলিভারি দর (প্রতি PL)</Text>
-                <View style={mStyles.inputRow}>
+                <Text style={[mStyles.fieldLabel, { color: T.textSecondary }]}>
+                  ডেলিভারি দর (প্রতি PL)
+                </Text>
+                <View
+                  style={[
+                    mStyles.inputRow,
+                    { borderColor: T.border, backgroundColor: T.inputBg },
+                  ]}
+                >
                   <TextInput
-                    style={mStyles.input}
+                    style={[mStyles.input, { color: T.textPrimary }]}
                     value={deliveryRate}
                     onChangeText={setDeliveryRate}
                     keyboardType="numeric"
                     placeholder="0.00"
-                    placeholderTextColor={COLORS.textMuted}
+                    placeholderTextColor={T.textMuted}
                   />
-                  <Text style={mStyles.inputSuffix}>৳</Text>
+                  <Text style={[mStyles.inputSuffix, { color: T.textMuted }]}>
+                    ৳
+                  </Text>
                 </View>
               </View>
 
               {/* Payment */}
               <View style={mStyles.field}>
-                <Text style={mStyles.fieldLabel}>আজকের পেমেন্ট</Text>
-                <View style={mStyles.inputRow}>
+                <Text style={[mStyles.fieldLabel, { color: T.textSecondary }]}>
+                  আজকের পেমেন্ট
+                </Text>
+                <View
+                  style={[
+                    mStyles.inputRow,
+                    { borderColor: T.border, backgroundColor: T.inputBg },
+                  ]}
+                >
                   <TextInput
-                    style={mStyles.input}
+                    style={[mStyles.input, { color: T.textPrimary }]}
                     value={payment}
                     onChangeText={setPayment}
                     keyboardType="numeric"
                     placeholder="0"
-                    placeholderTextColor={COLORS.textMuted}
+                    placeholderTextColor={T.textMuted}
                   />
-                  <Text style={mStyles.inputSuffix}>৳</Text>
+                  <Text style={[mStyles.inputSuffix, { color: T.textMuted }]}>
+                    ৳
+                  </Text>
                 </View>
               </View>
             </View>
 
             {/* Summary calc */}
-            <View style={mStyles.calcCard}>
-              <Text style={mStyles.calcTitle}>হিসাব সারসংক্ষেপ</Text>
-              <View style={mStyles.calcRow}>
-                <Text style={mStyles.calcLabel}>
-                  মোট মূল্য ({delivered.toLocaleString()} × {rate})
-                </Text>
-                <Text style={mStyles.calcVal}>{formatCurrency(finalAmt)}</Text>
-              </View>
-              <View style={mStyles.calcRow}>
-                <Text style={mStyles.calcLabel}>আগাম জমা</Text>
-                <Text style={[mStyles.calcVal, { color: COLORS.success }]}>
-                  - {formatCurrency(advance)}
-                </Text>
-              </View>
-              <View style={mStyles.calcRow}>
-                <Text style={mStyles.calcLabel}>আজকের পেমেন্ট</Text>
-                <Text style={[mStyles.calcVal, { color: COLORS.success }]}>
-                  - {formatCurrency(paid)}
-                </Text>
-              </View>
+            <View style={[mStyles.calcCard, { backgroundColor: T.surface }]}>
+              <Text style={[mStyles.calcTitle, { color: T.textSecondary }]}>
+                হিসাব সারসংক্ষেপ
+              </Text>
+              {[
+                {
+                  label: `মোট মূল্য (${delivered.toLocaleString()} × ${rate})`,
+                  val: formatCurrency(finalAmt),
+                  color: T.textPrimary,
+                },
+                {
+                  label: "আগাম জমা",
+                  val: `- ${formatCurrency(advance)}`,
+                  color: T.success,
+                },
+                {
+                  label: "আজকের পেমেন্ট",
+                  val: `- ${formatCurrency(paid)}`,
+                  color: T.success,
+                },
+              ].map((r, i) => (
+                <View
+                  key={i}
+                  style={[mStyles.calcRow, { borderBottomColor: T.border }]}
+                >
+                  <Text style={[mStyles.calcLabel, { color: T.textSecondary }]}>
+                    {r.label}
+                  </Text>
+                  <Text style={[mStyles.calcVal, { color: r.color }]}>
+                    {r.val}
+                  </Text>
+                </View>
+              ))}
               <View
                 style={[
                   mStyles.calcRow,
                   mStyles.calcRowTotal,
                   {
-                    backgroundColor:
-                      dueAmt > 0 ? COLORS.dangerLight : COLORS.successLight,
+                    backgroundColor: dueAmt > 0 ? T.dangerSoft : T.successSoft,
                   },
                 ]}
               >
-                <Text style={[mStyles.calcLabel, { fontWeight: "800" }]}>
+                <Text
+                  style={[
+                    mStyles.calcLabel,
+                    { fontWeight: "800", color: T.textPrimary },
+                  ]}
+                >
                   বাকি
                 </Text>
                 <Text
-                  style={[
-                    mStyles.calcVal,
-                    {
-                      color: dueAmt > 0 ? COLORS.danger : COLORS.success,
-                      fontSize: 17,
-                      fontWeight: "900",
-                    },
-                  ]}
+                  style={{
+                    fontSize: 17,
+                    fontWeight: "900",
+                    color: dueAmt > 0 ? T.danger : T.success,
+                  }}
                 >
                   {formatCurrency(dueAmt)}
                 </Text>
               </View>
-
               {isActuallyPartial && (
                 <View
                   style={[
                     mStyles.calcRow,
                     {
-                      backgroundColor: "#E3F2FD",
+                      backgroundColor: T.infoSoft,
                       borderRadius: 8,
                       paddingHorizontal: 10,
                       marginTop: 6,
                     },
                   ]}
                 >
-                  <Text style={[mStyles.calcLabel, { color: "#1E88E5" }]}>
+                  <Text style={[mStyles.calcLabel, { color: T.info }]}>
                     নতুন অর্ডার (বাকি PL)
                   </Text>
                   <Text
                     style={[
                       mStyles.calcVal,
-                      { color: "#1E88E5", fontWeight: "800" },
+                      { color: T.info, fontWeight: "800" },
                     ]}
                   >
                     {remaining.toLocaleString()} PL
@@ -378,31 +532,37 @@ const DeliveryModal = ({
 
             {/* Due date */}
             {dueAmt > 0 && (
-              <View style={mStyles.dueDateCard}>
-                <Ionicons
-                  name="calendar-outline"
-                  size={16}
-                  color={COLORS.danger}
-                />
-                <Text style={mStyles.dueDateLabel}>বাকি পরিশোধের তারিখ</Text>
+              <View
+                style={[mStyles.dueDateCard, { backgroundColor: T.dangerSoft }]}
+              >
+                <Ionicons name="calendar-outline" size={16} color={T.danger} />
+                <Text style={[mStyles.dueDateLabel, { color: T.danger }]}>
+                  বাকি পরিশোধের তারিখ
+                </Text>
                 <TextInput
-                  style={mStyles.dueDateInput}
+                  style={[
+                    mStyles.dueDateInput,
+                    { color: T.danger, borderColor: T.danger },
+                  ]}
                   value={dueDate}
                   onChangeText={setDueDate}
                   placeholder="YYYY-MM-DD"
-                  placeholderTextColor={COLORS.textMuted}
+                  placeholderTextColor={T.danger + "80"}
                 />
               </View>
             )}
 
             {/* Notes */}
-            <View style={mStyles.notesCard}>
+            <View style={[mStyles.notesCard, { backgroundColor: T.surface }]}>
               <TextInput
-                style={mStyles.notesInput}
+                style={[
+                  mStyles.notesInput,
+                  { borderColor: T.border, color: T.textPrimary },
+                ]}
                 value={notes}
                 onChangeText={setNotes}
                 placeholder="নোট (ঐচ্ছিক)..."
-                placeholderTextColor={COLORS.textMuted}
+                placeholderTextColor={T.textMuted}
                 multiline
                 numberOfLines={2}
               />
@@ -412,14 +572,19 @@ const DeliveryModal = ({
           </ScrollView>
 
           {/* Submit */}
-          <View style={mStyles.footer}>
+          <View
+            style={[
+              mStyles.footer,
+              { backgroundColor: T.surface, borderTopColor: T.border },
+            ]}
+          >
             <TouchableOpacity
-              style={mStyles.submitBtn}
+              style={[mStyles.submitBtn, { backgroundColor: T.success }]}
               onPress={handleSubmit}
               disabled={saving}
             >
               {saving ? (
-                <ActivityIndicator color={COLORS.white} />
+                <ActivityIndicator color="#fff" />
               ) : (
                 <>
                   <Ionicons
@@ -429,7 +594,7 @@ const DeliveryModal = ({
                         : "checkmark-circle"
                     }
                     size={20}
-                    color={COLORS.white}
+                    color="#fff"
                   />
                   <Text style={mStyles.submitBtnText}>
                     {isActuallyPartial
@@ -446,7 +611,7 @@ const DeliveryModal = ({
   );
 };
 
-// ── Batch Order Row ──────────────────────────────────────
+// ─── Batch Order Row ───────────────────────────────────────────────────────────
 const BatchOrderRow = ({
   batchOrder,
   onDeliver,
@@ -456,27 +621,25 @@ const BatchOrderRow = ({
   onDeliver: () => void;
   onUnbatch: () => void;
 }) => {
-  const typeColor = getPonaTypeColor(batchOrder.order.ponaType);
+  const T = useTheme();
+  const STATUS = getStatusConfig(T);
+  const typeColor = getPonaTypeColor(batchOrder.order.ponaType) ?? T.accent;
   const st =
-    batchOrder.deliveryStatus === "delivered"
-      ? STATUS.delivered
-      : batchOrder.deliveryStatus === "partial"
-        ? STATUS.partial
-        : STATUS.pending;
+    STATUS[batchOrder.deliveryStatus as keyof typeof STATUS] ?? STATUS.pending;
 
   return (
     <View
       style={[
         rowStyles.card,
+        { backgroundColor: T.surface },
         batchOrder.deliveryStatus === "delivered" && rowStyles.cardDone,
       ]}
     >
       <View style={[rowStyles.typeBar, { backgroundColor: typeColor }]} />
-
       <View style={{ flex: 1, paddingLeft: 10 }}>
         {/* Top */}
         <View style={rowStyles.top}>
-          <Text style={rowStyles.customerName}>
+          <Text style={[rowStyles.customerName, { color: T.textPrimary }]}>
             {batchOrder.order.customerName}
           </Text>
           <View style={[rowStyles.statusPill, { backgroundColor: st.bg }]}>
@@ -487,7 +650,9 @@ const BatchOrderRow = ({
           </View>
         </View>
 
-        <Text style={rowStyles.mobile}>{batchOrder.order.customerMobile}</Text>
+        <Text style={[rowStyles.mobile, { color: T.textSecondary }]}>
+          {batchOrder.order.customerMobile}
+        </Text>
 
         {/* Type + Qty */}
         <View style={rowStyles.metaRow}>
@@ -498,37 +663,46 @@ const BatchOrderRow = ({
               {batchOrder.order.ponaType}
             </Text>
           </View>
-          <Text style={rowStyles.qty}>
-            {batchOrder.deliveryStatus === "delivered" ||
-            batchOrder.deliveryStatus === "partial"
+          <Text style={[rowStyles.qty, { color: T.textPrimary }]}>
+            {batchOrder.deliveryStatus !== "pending"
               ? `${(batchOrder.deliveredQuantity || 0).toLocaleString()} / ${batchOrder.order.plQuantity.toLocaleString()} PL`
               : `${batchOrder.order.plQuantity.toLocaleString()} PL`}
           </Text>
           {batchOrder.deliveryStatus === "partial" && (
-            <View style={rowStyles.partialBadge}>
-              <Text style={rowStyles.partialBadgeText}>আংশিক</Text>
+            <View
+              style={[rowStyles.partialBadge, { backgroundColor: T.infoSoft }]}
+            >
+              <Text style={[rowStyles.partialBadgeText, { color: T.info }]}>
+                আংশিক
+              </Text>
             </View>
           )}
         </View>
 
         {/* Financial info after delivery */}
-        {(batchOrder.deliveryStatus === "delivered" ||
-          batchOrder.deliveryStatus === "partial") && (
+        {batchOrder.deliveryStatus !== "pending" && (
           <View style={rowStyles.deliveredInfo}>
-            <Text style={rowStyles.deliveredInfoItem}>
+            <Text
+              style={[rowStyles.deliveredInfoItem, { color: T.textSecondary }]}
+            >
               পেয়েছি:{" "}
-              <Text style={rowStyles.greenText}>
+              <Text style={{ color: T.success, fontWeight: "700" }}>
                 {formatCurrency(batchOrder.customerPayment || 0)}
               </Text>
             </Text>
             {(batchOrder.dueAmount || 0) > 0 && (
-              <Text style={rowStyles.deliveredInfoItem}>
+              <Text
+                style={[
+                  rowStyles.deliveredInfoItem,
+                  { color: T.textSecondary },
+                ]}
+              >
                 বাকি:{" "}
-                <Text style={rowStyles.redText}>
+                <Text style={{ color: T.danger, fontWeight: "700" }}>
                   {formatCurrency(batchOrder.dueAmount || 0)}
                 </Text>
                 {batchOrder.duePaymentDate ? (
-                  <Text style={rowStyles.greyText}>
+                  <Text style={{ color: T.textMuted }}>
                     {" "}
                     ({formatDate(batchOrder.duePaymentDate)} এর মধ্যে)
                   </Text>
@@ -541,17 +715,25 @@ const BatchOrderRow = ({
         {/* Action buttons */}
         {batchOrder.deliveryStatus === "pending" && (
           <View style={rowStyles.actionRow}>
-            <TouchableOpacity style={rowStyles.deliverBtn} onPress={onDeliver}>
-              <Ionicons name="boat" size={13} color={COLORS.white} />
+            <TouchableOpacity
+              style={[rowStyles.deliverBtn, { backgroundColor: T.accent }]}
+              onPress={onDeliver}
+            >
+              <Ionicons name="boat" size={13} color="#fff" />
               <Text style={rowStyles.deliverBtnText}>ডেলিভারি</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={rowStyles.unbatchBtn} onPress={onUnbatch}>
+            <TouchableOpacity
+              style={[rowStyles.unbatchBtn, { borderColor: T.danger }]}
+              onPress={onUnbatch}
+            >
               <Ionicons
                 name="remove-circle-outline"
                 size={13}
-                color={COLORS.danger}
+                color={T.danger}
               />
-              <Text style={rowStyles.unbatchBtnText}>আনব্যাচ</Text>
+              <Text style={[rowStyles.unbatchBtnText, { color: T.danger }]}>
+                আনব্যাচ
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -560,8 +742,9 @@ const BatchOrderRow = ({
   );
 };
 
-// ── Main Screen ──────────────────────────────────────────
+// ─── Main Screen ───────────────────────────────────────────────────────────────
 export const BatchDetailsScreen = () => {
+  const T = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { batchId } = route.params;
@@ -589,11 +772,10 @@ export const BatchDetailsScreen = () => {
     fetchBatch();
   }, []);
 
-  // ── Unbatch ────────────────────────────────────────────
   const handleUnbatch = (bo: BatchOrder) => {
     Alert.alert(
       "আনব্যাচ করুন",
-      `"${bo.order.customerName}" এর অর্ডারটি ব্যাচ থেকে সরাতে চান?\n\nঅর্ডারটি pending হয়ে যাবে এবং পরবর্তী ব্যাচে যোগ করা যাবে।`,
+      `"${bo.order.customerName}" এর অর্ডারটি ব্যাচ থেকে সরাতে চান?\n\nঅর্ডারটি pending হয়ে যাবে।`,
       [
         { text: "না", style: "cancel" },
         {
@@ -612,7 +794,6 @@ export const BatchDetailsScreen = () => {
     );
   };
 
-  // ── Record Delivery ────────────────────────────────────
   const handleDeliverySubmit = async (data: any) => {
     if (!selectedBO) return;
     setSaving(true);
@@ -649,14 +830,20 @@ export const BatchDetailsScreen = () => {
 
   if (loading)
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={[styles.center, { backgroundColor: T.bg }]}>
+        <ActivityIndicator size="large" color={T.accent} />
       </View>
     );
   if (!batch) return null;
 
+  const PONA_CHIPS = [
+    { key: "Golda", label: "গলদা", color: "#F5A623" },
+    { key: "Bagda", label: "বাগদা", color: "#1E88E5" },
+    { key: "Vannamei", label: "ভেনামি", color: "#43A047" },
+  ];
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: T.bg }]}>
       <ScrollView
         refreshControl={
           <RefreshControl
@@ -665,30 +852,45 @@ export const BatchDetailsScreen = () => {
               setRefreshing(true);
               fetchBatch();
             }}
-            colors={[COLORS.primary]}
+            colors={[T.accent]}
+            tintColor={T.accent}
           />
         }
         showsVerticalScrollIndicator={false}
       >
         {/* ── Header card ── */}
-        <View style={styles.headerCard}>
+        <View
+          style={[
+            styles.headerCard,
+            { backgroundColor: T.surface, borderBottomColor: T.border },
+          ]}
+        >
           <View style={styles.headerTop}>
             <View>
-              <Text style={styles.batchNum}>{batch.batchNumber}</Text>
-              <Text style={styles.batchDate}>
+              <Text style={[styles.batchNum, { color: T.textPrimary }]}>
+                {batch.batchNumber}
+              </Text>
+              <Text style={[styles.batchDate, { color: T.textSecondary }]}>
                 {formatDate(batch.batchDate)}
               </Text>
             </View>
-            <View style={styles.progressCircle}>
-              <Text style={styles.progressNum}>
+            <View
+              style={[
+                styles.progressCircle,
+                { backgroundColor: T.accentSoft, borderColor: T.accent },
+              ]}
+            >
+              <Text style={[styles.progressNum, { color: T.accent }]}>
                 {deliveredCount}/{totalOrders}
               </Text>
-              <Text style={styles.progressLabel}>সম্পন্ন</Text>
+              <Text style={[styles.progressLabel, { color: T.accent }]}>
+                সম্পন্ন
+              </Text>
             </View>
           </View>
 
           {/* Progress bar */}
-          <View style={styles.progressBg}>
+          <View style={[styles.progressBg, { backgroundColor: T.border }]}>
             <View
               style={[
                 styles.progressFill,
@@ -697,11 +899,12 @@ export const BatchDetailsScreen = () => {
                     totalOrders > 0
                       ? `${(deliveredCount / totalOrders) * 100}%`
                       : "0%",
+                  backgroundColor: T.accent,
                 },
               ]}
             />
           </View>
-          <Text style={styles.progressText}>
+          <Text style={[styles.progressText, { color: T.textSecondary }]}>
             {pendingCount > 0
               ? `${pendingCount} টি বাকি আছে`
               : "সব ডেলিভারি সম্পন্ন ✓"}
@@ -709,83 +912,83 @@ export const BatchDetailsScreen = () => {
 
           {/* Pona chips */}
           <View style={styles.ponaRow}>
-            {batch.totalOrderedGolda > 0 && (
-              <View
-                style={[
-                  styles.ponaChip,
-                  { backgroundColor: "#F5A62318", borderColor: "#F5A623" },
-                ]}
-              >
-                <Text style={[styles.ponaChipTitle, { color: "#F5A623" }]}>
-                  গলদা
-                </Text>
-                <Text style={[styles.ponaChipSub, { color: "#F5A623" }]}>
-                  {batch.totalDeliveredGolda}/{batch.totalOrderedGolda}
-                </Text>
-              </View>
-            )}
-            {batch.totalOrderedBagda > 0 && (
-              <View
-                style={[
-                  styles.ponaChip,
-                  { backgroundColor: "#1E88E518", borderColor: "#1E88E5" },
-                ]}
-              >
-                <Text style={[styles.ponaChipTitle, { color: "#1E88E5" }]}>
-                  বাগদা
-                </Text>
-                <Text style={[styles.ponaChipSub, { color: "#1E88E5" }]}>
-                  {batch.totalDeliveredBagda}/{batch.totalOrderedBagda}
-                </Text>
-              </View>
-            )}
-            {batch.totalOrderedVannamei > 0 && (
-              <View
-                style={[
-                  styles.ponaChip,
-                  { backgroundColor: "#43A04718", borderColor: "#43A047" },
-                ]}
-              >
-                <Text style={[styles.ponaChipTitle, { color: "#43A047" }]}>
-                  ভেনামি
-                </Text>
-                <Text style={[styles.ponaChipSub, { color: "#43A047" }]}>
-                  {batch.totalDeliveredVannamei}/{batch.totalOrderedVannamei}
-                </Text>
-              </View>
-            )}
+            {PONA_CHIPS.map(({ key, label, color }) => {
+              const ordered = (batch as any)[`totalOrdered${key}`] ?? 0;
+              const delivered = (batch as any)[`totalDelivered${key}`] ?? 0;
+              if (ordered === 0) return null;
+              return (
+                <View
+                  key={key}
+                  style={[
+                    styles.ponaChip,
+                    { backgroundColor: color + "18", borderColor: color },
+                  ]}
+                >
+                  <Text style={[styles.ponaChipTitle, { color }]}>{label}</Text>
+                  <Text style={[styles.ponaChipSub, { color }]}>
+                    {delivered}/{ordered}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
 
           {/* Financial row */}
           <View style={styles.finRow}>
-            <View style={styles.finItem}>
-              <Text style={styles.finLabel}>প্রাপ্ত</Text>
-              <Text style={[styles.finVal, { color: COLORS.success }]}>
+            <View style={[styles.finItem, { backgroundColor: T.successSoft }]}>
+              <Text style={[styles.finLabel, { color: T.textSecondary }]}>
+                প্রাপ্ত
+              </Text>
+              <Text style={[styles.finVal, { color: T.success }]}>
                 {formatCurrency(batch.totalCollected)}
               </Text>
             </View>
-            {batch.totalDue > 0 && (
-              <View style={[styles.finItem, styles.dueItem]}>
-                <Text style={styles.finLabel}>বাকি</Text>
-                <Text style={[styles.finVal, { color: COLORS.danger }]}>
+            {(batch.totalDue ?? 0) > 0 && (
+              <View
+                style={[
+                  styles.finItem,
+                  styles.dueItem,
+                  { backgroundColor: T.dangerSoft },
+                ]}
+              >
+                <Text style={[styles.finLabel, { color: T.textSecondary }]}>
+                  বাকি
+                </Text>
+                <Text style={[styles.finVal, { color: T.danger }]}>
                   {formatCurrency(batch.totalDue)}
                 </Text>
-                <View style={styles.duePeopleBadge}>
-                  <Text style={styles.duePeopleText}>
-                    {batch.duePendingCount} জন
-                  </Text>
-                </View>
+                {(batch.duePendingCount ?? 0) > 0 && (
+                  <View
+                    style={[
+                      styles.duePeopleBadge,
+                      { backgroundColor: T.danger },
+                    ]}
+                  >
+                    <Text style={styles.duePeopleText}>
+                      {batch.duePendingCount} জন
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
-            <View style={styles.finItem}>
-              <Text style={styles.finLabel}>অর্ডার</Text>
-              <Text style={styles.finVal}>{totalOrders} টি</Text>
+            <View style={[styles.finItem, { backgroundColor: T.accentSoft }]}>
+              <Text style={[styles.finLabel, { color: T.textSecondary }]}>
+                অর্ডার
+              </Text>
+              <Text style={[styles.finVal, { color: T.accent }]}>
+                {totalOrders} টি
+              </Text>
             </View>
           </View>
         </View>
 
         {/* ── Legend ── */}
-        <View style={styles.legendRow}>
+        <View
+          style={[
+            styles.legendRow,
+            { backgroundColor: T.surface, borderTopColor: T.border },
+          ]}
+        >
           {[
             { color: "#F5A623", label: "পেন্ডিং" },
             { color: "#1E88E5", label: "আংশিক" },
@@ -793,21 +996,21 @@ export const BatchDetailsScreen = () => {
           ].map((l) => (
             <View key={l.label} style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: l.color }]} />
-              <Text style={styles.legendText}>{l.label}</Text>
+              <Text style={[styles.legendText, { color: T.textSecondary }]}>
+                {l.label}
+              </Text>
             </View>
           ))}
           <View style={styles.legendSep} />
-          <Ionicons
-            name="remove-circle-outline"
-            size={14}
-            color={COLORS.danger}
-          />
-          <Text style={styles.legendText}>আনব্যাচ করা যাবে</Text>
+          <Ionicons name="remove-circle-outline" size={14} color={T.danger} />
+          <Text style={[styles.legendText, { color: T.textSecondary }]}>
+            আনব্যাচ
+          </Text>
         </View>
 
         {/* ── Order list ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
+          <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>
             অর্ডার তালিকা ({totalOrders} টি)
           </Text>
           <View style={styles.orderList}>
@@ -828,19 +1031,32 @@ export const BatchDetailsScreen = () => {
         {/* ── Expenses ── */}
         {batch.expenses && batch.expenses.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>খরচের বিবরণ</Text>
-            <View style={styles.expenseCard}>
-              {batch.expenses.map((e, i) => (
-                <View key={i} style={styles.expenseRow}>
-                  <Text style={styles.expenseLabel}>{e.label}</Text>
-                  <Text style={styles.expenseAmt}>
+            <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>
+              খরচের বিবরণ
+            </Text>
+            <View style={[styles.expenseCard, { backgroundColor: T.surface }]}>
+              {batch.expenses.map((e: any, i: number) => (
+                <View
+                  key={i}
+                  style={[styles.expenseRow, { borderBottomColor: T.border }]}
+                >
+                  <Text
+                    style={[styles.expenseLabel, { color: T.textSecondary }]}
+                  >
+                    {e.label}
+                  </Text>
+                  <Text style={[styles.expenseAmt, { color: T.textPrimary }]}>
                     {formatCurrency(e.amount)}
                   </Text>
                 </View>
               ))}
               <View style={[styles.expenseRow, styles.expenseTotal]}>
-                <Text style={styles.expenseTotalLabel}>মোট খরচ</Text>
-                <Text style={styles.expenseTotalAmt}>
+                <Text
+                  style={[styles.expenseTotalLabel, { color: T.textPrimary }]}
+                >
+                  মোট খরচ
+                </Text>
+                <Text style={[styles.expenseTotalAmt, { color: T.warning }]}>
                   {formatCurrency(batch.totalExpenses)}
                 </Text>
               </View>
@@ -853,31 +1069,30 @@ export const BatchDetailsScreen = () => {
 
       {/* ── Bottom bar ── */}
       {batch.status !== "completed" && (
-        <View style={styles.bottomBar}>
+        <View
+          style={[
+            styles.bottomBar,
+            { backgroundColor: T.surface, borderTopColor: T.border },
+          ]}
+        >
           {!canComplete ? (
-            <View style={styles.pendingWarn}>
-              <Ionicons
-                name="warning-outline"
-                size={18}
-                color={COLORS.warning}
-              />
-              <Text style={styles.pendingWarnText}>
+            <View
+              style={[styles.pendingWarn, { backgroundColor: T.warningSoft }]}
+            >
+              <Ionicons name="warning-outline" size={18} color={T.warning} />
+              <Text style={[styles.pendingWarnText, { color: T.warning }]}>
                 {pendingCount} টি ডেলিভারি বাকি। সব ডেলিভারি করলে ব্যাচ কমপ্লিট
                 করা যাবে।
               </Text>
             </View>
           ) : (
             <TouchableOpacity
-              style={styles.completeBtn}
+              style={[styles.completeBtn, { backgroundColor: T.success }]}
               onPress={() =>
                 navigation.navigate("CompleteBatch", { batchId: batch.id })
               }
             >
-              <Ionicons
-                name="checkmark-done-circle"
-                size={20}
-                color={COLORS.white}
-              />
+              <Ionicons name="checkmark-done-circle" size={20} color="#fff" />
               <Text style={styles.completeBtnText}>
                 খরচ দিয়ে ব্যাচ কমপ্লিট করুন
               </Text>
@@ -886,7 +1101,6 @@ export const BatchDetailsScreen = () => {
         </View>
       )}
 
-      {/* ── Delivery Modal ── */}
       <DeliveryModal
         visible={modalVisible}
         batchOrder={selectedBO}
@@ -901,38 +1115,31 @@ export const BatchDetailsScreen = () => {
   );
 };
 
-// ── Styles ───────────────────────────────────────────────
+// ─── Styles (color-neutral) ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  headerCard: { backgroundColor: COLORS.white, padding: 16, elevation: 2 },
+  headerCard: { padding: 16, borderBottomWidth: 1 },
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 12,
   },
-  batchNum: { fontSize: 20, fontWeight: "900", color: COLORS.text },
-  batchDate: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
+  batchNum: { fontSize: 20, fontWeight: "900" },
+  batchDate: { fontSize: 13, marginTop: 2 },
   progressCircle: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: COLORS.primary + "15",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: COLORS.primary,
   },
-  progressNum: { fontSize: 14, fontWeight: "800", color: COLORS.primary },
-  progressLabel: { fontSize: 9, color: COLORS.primary },
-  progressBg: {
-    height: 8,
-    backgroundColor: COLORS.border,
-    borderRadius: 4,
-    marginBottom: 6,
-  },
-  progressFill: { height: 8, borderRadius: 4, backgroundColor: COLORS.primary },
-  progressText: { fontSize: 11, color: COLORS.textSecondary, marginBottom: 12 },
+  progressNum: { fontSize: 14, fontWeight: "800" },
+  progressLabel: { fontSize: 9 },
+  progressBg: { height: 8, borderRadius: 4, marginBottom: 6 },
+  progressFill: { height: 8, borderRadius: 4 },
+  progressText: { fontSize: 11, marginBottom: 12 },
   ponaRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
   ponaChip: {
     flex: 1,
@@ -944,101 +1151,76 @@ const styles = StyleSheet.create({
   ponaChipTitle: { fontSize: 11, fontWeight: "800" },
   ponaChipSub: { fontSize: 11, fontWeight: "600" },
   finRow: { flexDirection: "row", gap: 8 },
-  finItem: {
-    flex: 1,
-    alignItems: "center",
-    padding: 8,
-    backgroundColor: COLORS.background,
-    borderRadius: 8,
-  },
-  dueItem: { backgroundColor: COLORS.dangerLight },
-  finLabel: { fontSize: 11, color: COLORS.textSecondary },
-  finVal: { fontSize: 14, fontWeight: "800", color: COLORS.text, marginTop: 2 },
+  finItem: { flex: 1, alignItems: "center", padding: 8, borderRadius: 8 },
+  dueItem: {},
+  finLabel: { fontSize: 11 },
+  finVal: { fontSize: 14, fontWeight: "800", marginTop: 2 },
   duePeopleBadge: {
-    backgroundColor: COLORS.danger,
     borderRadius: 8,
     paddingHorizontal: 5,
     paddingVertical: 1,
     marginTop: 2,
   },
-  duePeopleText: { color: COLORS.white, fontSize: 9, fontWeight: "700" },
+  duePeopleText: { color: "#fff", fontSize: 9, fontWeight: "700" },
   legendRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: COLORS.white,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
   },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 11, color: COLORS.textSecondary },
+  legendText: { fontSize: 11 },
   legendSep: { flex: 1 },
   section: { paddingHorizontal: 12, paddingTop: 14 },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: COLORS.text,
-    marginBottom: 8,
-  },
+  sectionTitle: { fontSize: 14, fontWeight: "800", marginBottom: 8 },
   orderList: { gap: 8 },
-  expenseCard: { backgroundColor: COLORS.white, borderRadius: 10, padding: 12 },
+  expenseCard: { borderRadius: 10, padding: 12 },
   expenseRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border + "50",
   },
-  expenseLabel: { fontSize: 13, color: COLORS.textSecondary },
-  expenseAmt: { fontSize: 13, fontWeight: "700", color: COLORS.text },
+  expenseLabel: { fontSize: 13 },
+  expenseAmt: { fontSize: 13, fontWeight: "700" },
   expenseTotal: { borderBottomWidth: 0, marginTop: 4 },
-  expenseTotalLabel: { fontSize: 14, fontWeight: "800", color: COLORS.text },
-  expenseTotalAmt: { fontSize: 16, fontWeight: "900", color: COLORS.warning },
+  expenseTotalLabel: { fontSize: 14, fontWeight: "800" },
+  expenseTotalAmt: { fontSize: 16, fontWeight: "900" },
   bottomBar: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: COLORS.white,
     padding: 14,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
     elevation: 10,
   },
   pendingWarn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: COLORS.warningLight,
     borderRadius: 10,
     padding: 12,
   },
-  pendingWarnText: {
-    flex: 1,
-    fontSize: 12,
-    color: COLORS.warning,
-    fontWeight: "600",
-  },
+  pendingWarnText: { flex: 1, fontSize: 12, fontWeight: "600" },
   completeBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: COLORS.success,
     borderRadius: 12,
     paddingVertical: 14,
   },
-  completeBtnText: { color: COLORS.white, fontWeight: "800", fontSize: 15 },
+  completeBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
 });
 
 const rowStyles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: COLORS.white,
     borderRadius: 12,
     overflow: "hidden",
     elevation: 1,
@@ -1052,12 +1234,7 @@ const rowStyles = StyleSheet.create({
     paddingTop: 10,
     paddingRight: 10,
   },
-  customerName: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.text,
-    flex: 1,
-  },
+  customerName: { fontSize: 14, fontWeight: "700", flex: 1 },
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -1067,12 +1244,7 @@ const rowStyles = StyleSheet.create({
     borderRadius: 10,
   },
   statusText: { fontSize: 10, fontWeight: "700" },
-  mobile: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    paddingRight: 10,
-    marginTop: 1,
-  },
+  mobile: { fontSize: 12, paddingRight: 10, marginTop: 1 },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1082,66 +1254,52 @@ const rowStyles = StyleSheet.create({
   },
   typePill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   typeText: { fontSize: 10, fontWeight: "700" },
-  qty: { fontSize: 12, fontWeight: "600", color: COLORS.text },
-  partialBadge: {
-    backgroundColor: "#E3F2FD",
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  partialBadgeText: { fontSize: 9, fontWeight: "700", color: "#1E88E5" },
+  qty: { fontSize: 12, fontWeight: "600" },
+  partialBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
+  partialBadgeText: { fontSize: 9, fontWeight: "700" },
   deliveredInfo: { paddingBottom: 10, paddingRight: 10, marginTop: 4, gap: 2 },
-  deliveredInfoItem: { fontSize: 12, color: COLORS.textSecondary },
-  greenText: { color: COLORS.success, fontWeight: "700" },
-  redText: { color: COLORS.danger, fontWeight: "700" },
-  greyText: { color: COLORS.textMuted },
+  deliveredInfoItem: { fontSize: 12 },
   actionRow: { flexDirection: "row", gap: 8, padding: 10, paddingTop: 6 },
   deliverBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: COLORS.primary,
     borderRadius: 7,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  deliverBtnText: { color: COLORS.white, fontSize: 11, fontWeight: "700" },
+  deliverBtnText: { color: "#fff", fontSize: 11, fontWeight: "700" },
   unbatchBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     borderWidth: 1.5,
-    borderColor: COLORS.danger,
     borderRadius: 7,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  unbatchBtnText: { color: COLORS.danger, fontSize: 11, fontWeight: "700" },
+  unbatchBtnText: { fontSize: 11, fontWeight: "700" },
 });
 
 const mStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     padding: 16,
-    backgroundColor: COLORS.white,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
-  headerTitle: { fontSize: 17, fontWeight: "800", color: COLORS.text },
-  headerSub: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
+  headerTitle: { fontSize: 17, fontWeight: "800" },
+  headerSub: { fontSize: 13, marginTop: 2 },
   closeBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: COLORS.background,
     alignItems: "center",
     justifyContent: "center",
   },
   infoCard: {
-    backgroundColor: COLORS.white,
     marginHorizontal: 14,
     marginTop: 14,
     borderRadius: 12,
@@ -1154,44 +1312,39 @@ const mStyles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border + "50",
   },
-  infoLabel: { fontSize: 13, color: COLORS.textSecondary },
-  infoValue: { fontSize: 13, fontWeight: "700", color: COLORS.text },
+  infoLabel: { fontSize: 13 },
+  infoValue: { fontSize: 13, fontWeight: "700" },
   typePill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   typePillText: { fontSize: 11, fontWeight: "700" },
   partialToggleCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.white,
     marginHorizontal: 14,
     marginTop: 10,
     borderRadius: 12,
     padding: 14,
   },
-  partialToggleTitle: { fontSize: 14, fontWeight: "700", color: COLORS.text },
-  partialToggleSub: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
+  partialToggleTitle: { fontSize: 14, fontWeight: "700" },
+  partialToggleSub: { fontSize: 11, marginTop: 2 },
   toggleBtn: {
     width: 48,
     height: 28,
     borderRadius: 14,
-    backgroundColor: COLORS.border,
     justifyContent: "center",
     paddingHorizontal: 3,
   },
-  toggleBtnOn: { backgroundColor: COLORS.info },
   toggleThumb: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: COLORS.white,
+    backgroundColor: "#fff",
   },
   toggleThumbOn: { alignSelf: "flex-end" },
   partialBanner: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
-    backgroundColor: "#E3F2FD",
     marginHorizontal: 14,
     marginTop: 8,
     borderRadius: 8,
@@ -1200,60 +1353,35 @@ const mStyles = StyleSheet.create({
   partialBannerText: {
     flex: 1,
     fontSize: 12,
-    color: "#1E88E5",
     fontWeight: "500",
     lineHeight: 18,
   },
   fieldsCard: {
-    backgroundColor: COLORS.white,
     marginHorizontal: 14,
     marginTop: 10,
     borderRadius: 12,
     padding: 14,
   },
   field: { marginBottom: 14 },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-    marginBottom: 6,
-  },
+  fieldLabel: { fontSize: 13, fontWeight: "600", marginBottom: 6 },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1.5,
-    borderColor: COLORS.border,
     borderRadius: 10,
-    backgroundColor: COLORS.background,
   },
-  input: { flex: 1, padding: 11, fontSize: 15, color: COLORS.text },
-  inputSuffix: {
-    paddingRight: 12,
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.textMuted,
-  },
+  input: { flex: 1, padding: 11, fontSize: 15 },
+  inputSuffix: { paddingRight: 12, fontSize: 13, fontWeight: "700" },
   qtyProgress: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     marginTop: 6,
   },
-  qtyProgressBg: {
-    flex: 1,
-    height: 6,
-    backgroundColor: COLORS.border,
-    borderRadius: 3,
-  },
+  qtyProgressBg: { flex: 1, height: 6, borderRadius: 3 },
   qtyProgressFill: { height: 6, borderRadius: 3 },
-  qtyProgressText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: COLORS.textSecondary,
-    width: 36,
-  },
+  qtyProgressText: { fontSize: 11, fontWeight: "700", width: 36 },
   calcCard: {
-    backgroundColor: COLORS.white,
     marginHorizontal: 14,
     marginTop: 10,
     borderRadius: 12,
@@ -1262,7 +1390,6 @@ const mStyles = StyleSheet.create({
   calcTitle: {
     fontSize: 12,
     fontWeight: "800",
-    color: COLORS.textSecondary,
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 10,
@@ -1272,7 +1399,6 @@ const mStyles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border + "50",
   },
   calcRowTotal: {
     borderBottomWidth: 0,
@@ -1280,31 +1406,27 @@ const mStyles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
   },
-  calcLabel: { fontSize: 13, color: COLORS.textSecondary },
-  calcVal: { fontSize: 14, fontWeight: "700", color: COLORS.text },
+  calcLabel: { fontSize: 13 },
+  calcVal: { fontSize: 14, fontWeight: "700" },
   dueDateCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: COLORS.dangerLight,
     marginHorizontal: 14,
     marginTop: 10,
     borderRadius: 10,
     padding: 12,
   },
-  dueDateLabel: { fontSize: 12, color: COLORS.danger, fontWeight: "600" },
+  dueDateLabel: { fontSize: 12, fontWeight: "600" },
   dueDateInput: {
     flex: 1,
     fontSize: 14,
-    color: COLORS.danger,
     fontWeight: "700",
     borderWidth: 1,
-    borderColor: COLORS.danger,
     borderRadius: 6,
     padding: 6,
   },
   notesCard: {
-    backgroundColor: COLORS.white,
     marginHorizontal: 14,
     marginTop: 10,
     borderRadius: 12,
@@ -1312,28 +1434,20 @@ const mStyles = StyleSheet.create({
   },
   notesInput: {
     borderWidth: 1.5,
-    borderColor: COLORS.border,
     borderRadius: 8,
     padding: 10,
     fontSize: 14,
-    color: COLORS.text,
     minHeight: 60,
     textAlignVertical: "top",
   },
-  footer: {
-    backgroundColor: COLORS.white,
-    padding: 14,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
+  footer: { padding: 14, borderTopWidth: 1 },
   submitBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: COLORS.success,
     borderRadius: 12,
     paddingVertical: 15,
   },
-  submitBtnText: { color: COLORS.white, fontWeight: "800", fontSize: 15 },
+  submitBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
 });

@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Dimensions,
   ActivityIndicator,
+  useColorScheme,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -22,74 +23,172 @@ const { width } = Dimensions.get("window");
 const CARD_W = (width - 52) / 2;
 const REPORT_W = (width - 52) / 2;
 
-const MiniCard = ({ title, value, icon, color, bg, onPress }: any) => (
-  <TouchableOpacity
-    style={[styles.miniCard, { width: CARD_W }]}
-    onPress={onPress}
-    activeOpacity={0.85}
-  >
-    <View style={[styles.miniCardIcon, { backgroundColor: bg }]}>
-      <Ionicons name={icon} size={20} color={color} />
-    </View>
-    <Text style={styles.miniCardTitle}>{title}</Text>
-    <Text style={[styles.miniCardValue, { color }]}>{value}</Text>
-  </TouchableOpacity>
-);
+// ─── Palettes ──────────────────────────────────────────────────────────────────
+const LIGHT = {
+  bg: "#F4F5F9",
+  surface: "#FFFFFF",
+  border: "rgba(0,0,0,0.07)",
+  shadow: "#000",
+  textPrimary: "#111827",
+  textSecondary: "#6B7280",
+  textMuted: "#9CA3AF",
+  accent: "#6C63FF",
+  danger: "#F03F5F",
+  dangerSoft: "rgba(240,63,95,0.09)",
+  success: "#18B565",
+  successSoft: "rgba(24,181,101,0.10)",
+  warning: "#E09400",
+  white: "#FFFFFF",
+  heroBg: "#6C63FF",
+  heroText: "#FFFFFF",
+  heroSubText: "rgba(255,255,255,0.65)",
+  chartBg: "#FFFFFF",
+  chartLine: "rgba(108,99,255,1)",
+  chartLabel: "#6B7280",
+};
 
-const WideCard = ({ title, value, sub, icon, color, bg }: any) => (
-  <View style={[styles.wideCard, { borderLeftColor: color }]}>
-    <View style={[styles.wideCardIcon, { backgroundColor: bg }]}>
-      <Ionicons name={icon} size={22} color={color} />
-    </View>
-    <View style={{ flex: 1 }}>
-      <Text style={styles.wideCardTitle}>{title}</Text>
-      <Text style={[styles.wideCardValue, { color }]}>{value}</Text>
-      {sub ? <Text style={styles.wideCardSub}>{sub}</Text> : null}
-    </View>
-  </View>
-);
+const DARK = {
+  bg: "#0F1117",
+  surface: "#1A1D27",
+  border: "rgba(255,255,255,0.07)",
+  shadow: "#000",
+  textPrimary: "#F0F2FF",
+  textSecondary: "#8A8FA8",
+  textMuted: "#545872",
+  accent: "#6C63FF",
+  danger: "#FF5E7E",
+  dangerSoft: "rgba(255,94,126,0.12)",
+  success: "#2ECC71",
+  successSoft: "rgba(46,204,113,0.12)",
+  warning: "#F0A500",
+  white: "#FFFFFF",
+  heroBg: "#1A1D27",
+  heroText: "#F0F2FF",
+  heroSubText: "rgba(240,242,255,0.5)",
+  chartBg: "#1A1D27",
+  chartLine: "rgba(108,99,255,1)",
+  chartLabel: "#8A8FA8",
+};
 
-const QuickAction = ({ icon, label, color, onPress }: any) => (
-  <TouchableOpacity
-    style={styles.quickBtn}
-    onPress={onPress}
-    activeOpacity={0.8}
-  >
-    <View style={[styles.quickIcon, { backgroundColor: color }]}>
-      <Ionicons name={icon} size={22} color={COLORS.white} />
-    </View>
-    <Text style={styles.quickLabel}>{label}</Text>
-  </TouchableOpacity>
-);
+const useTheme = () => (useColorScheme() === "dark" ? DARK : LIGHT);
 
-const SectionHeader = ({ title, actionLabel, onAction }: any) => (
-  <View style={styles.sectionHeader}>
-    <Text style={styles.sectionTitle}>{title}</Text>
-    {actionLabel ? (
-      <TouchableOpacity onPress={onAction}>
-        <Text style={styles.sectionAction}>{actionLabel} →</Text>
-      </TouchableOpacity>
-    ) : null}
-  </View>
-);
+// ─── Sub-components ────────────────────────────────────────────────────────────
+const MiniCard = ({ title, value, icon, color, bg, onPress }: any) => {
+  const T = useTheme();
+  return (
+    <TouchableOpacity
+      style={[
+        styles.miniCard,
+        { width: CARD_W, backgroundColor: T.surface, shadowColor: T.shadow },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <View style={[styles.miniCardIcon, { backgroundColor: bg }]}>
+        <Ionicons name={icon} size={20} color={color} />
+      </View>
+      <Text style={[styles.miniCardTitle, { color: T.textSecondary }]}>
+        {title}
+      </Text>
+      <Text style={[styles.miniCardValue, { color }]}>{value}</Text>
+    </TouchableOpacity>
+  );
+};
 
-const ReportCard = ({ icon, label, color, onPress }: any) => (
-  <TouchableOpacity
-    style={[styles.reportCard, { width: REPORT_W }]}
-    onPress={onPress}
-    activeOpacity={0.82}
-  >
-    <View style={[styles.reportCardIcon, { backgroundColor: color + "18" }]}>
-      <Ionicons name={icon} size={22} color={color} />
+const WideCard = ({ title, value, sub, icon, color, bg }: any) => {
+  const T = useTheme();
+  return (
+    <View
+      style={[
+        styles.wideCard,
+        {
+          backgroundColor: T.surface,
+          borderLeftColor: color,
+          shadowColor: T.shadow,
+        },
+      ]}
+    >
+      <View style={[styles.wideCardIcon, { backgroundColor: bg }]}>
+        <Ionicons name={icon} size={22} color={color} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.wideCardTitle, { color: T.textSecondary }]}>
+          {title}
+        </Text>
+        <Text style={[styles.wideCardValue, { color }]}>{value}</Text>
+        {sub ? (
+          <Text style={[styles.wideCardSub, { color: T.textMuted }]}>
+            {sub}
+          </Text>
+        ) : null}
+      </View>
     </View>
-    <Text style={styles.reportCardLabel}>{label}</Text>
-    <View style={[styles.reportCardArrow, { backgroundColor: color + "18" }]}>
-      <Ionicons name="arrow-forward" size={12} color={color} />
-    </View>
-  </TouchableOpacity>
-);
+  );
+};
 
+const QuickAction = ({ icon, label, color, onPress }: any) => {
+  const T = useTheme();
+  return (
+    <TouchableOpacity
+      style={styles.quickBtn}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <View style={[styles.quickIcon, { backgroundColor: color }]}>
+        <Ionicons name={icon} size={22} color="#FFFFFF" />
+      </View>
+      <Text style={[styles.quickLabel, { color: T.textSecondary }]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
+const SectionHeader = ({ title, actionLabel, onAction }: any) => {
+  const T = useTheme();
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>
+        {title}
+      </Text>
+      {actionLabel ? (
+        <TouchableOpacity onPress={onAction}>
+          <Text style={[styles.sectionAction, { color: T.accent }]}>
+            {actionLabel} →
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+};
+
+const ReportCard = ({ icon, label, color, onPress }: any) => {
+  const T = useTheme();
+  return (
+    <TouchableOpacity
+      style={[
+        styles.reportCard,
+        { width: REPORT_W, backgroundColor: T.surface, shadowColor: T.shadow },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.82}
+    >
+      <View style={[styles.reportCardIcon, { backgroundColor: color + "18" }]}>
+        <Ionicons name={icon} size={22} color={color} />
+      </View>
+      <Text style={[styles.reportCardLabel, { color: T.textPrimary }]}>
+        {label}
+      </Text>
+      <View style={[styles.reportCardArrow, { backgroundColor: color + "18" }]}>
+        <Ionicons name="arrow-forward" size={12} color={color} />
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+// ─── Main Screen ───────────────────────────────────────────────────────────────
 export const DashboardScreen = () => {
+  const T = useTheme();
   const navigation = useNavigation<any>();
   const { dashboardStats, setDashboardStats } = useAppStore();
   const [loading, setLoading] = useState(true);
@@ -116,29 +215,31 @@ export const DashboardScreen = () => {
   const isProfit = profit >= 0;
 
   const chartConfig = {
-    backgroundColor: COLORS.white,
-    backgroundGradientFrom: COLORS.white,
-    backgroundGradientTo: COLORS.white,
+    backgroundColor: T.chartBg,
+    backgroundGradientFrom: T.chartBg,
+    backgroundGradientTo: T.chartBg,
     decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(10,102,64,${opacity})`,
-    labelColor: () => COLORS.textSecondary,
-    propsForDots: { r: "4", strokeWidth: "2", stroke: COLORS.primary },
+    color: (opacity = 1) => `rgba(108,99,255,${opacity})`,
+    labelColor: () => T.chartLabel,
+    propsForDots: { r: "4", strokeWidth: "2", stroke: T.accent },
     propsForLabels: { fontSize: 10 },
-    propsForBackgroundLines: { strokeDasharray: "", stroke: COLORS.border },
+    propsForBackgroundLines: { strokeDasharray: "", stroke: T.border },
   };
 
   if (loading) {
     return (
-      <View style={styles.loadingBox}>
-        <View style={styles.loadingLogo}>
-          <Ionicons name="fish" size={40} color={COLORS.primary} />
+      <View style={[styles.loadingBox, { backgroundColor: T.bg }]}>
+        <View style={[styles.loadingLogo, { backgroundColor: T.successSoft }]}>
+          <Ionicons name="fish" size={40} color={T.accent} />
         </View>
         <ActivityIndicator
           size="large"
-          color={COLORS.primary}
+          color={T.accent}
           style={{ marginTop: 16 }}
         />
-        <Text style={styles.loadingText}>লোড হচ্ছে...</Text>
+        <Text style={[styles.loadingText, { color: T.textSecondary }]}>
+          লোড হচ্ছে...
+        </Text>
       </View>
     );
   }
@@ -150,7 +251,7 @@ export const DashboardScreen = () => {
     {
       icon: "calendar-outline",
       label: "দৈনিক রিপোর্ট",
-      color: COLORS.primary,
+      color: T.accent,
       screen: "DailyReport",
       params: { date: today },
     },
@@ -164,14 +265,14 @@ export const DashboardScreen = () => {
     {
       icon: "people-outline",
       label: "বাকি রিপোর্ট",
-      color: COLORS.danger,
+      color: T.danger,
       screen: "CustomerDueReport",
       params: undefined,
     },
     {
       icon: "card-outline",
       label: "খরচ রিপোর্ট",
-      color: COLORS.warning,
+      color: T.warning,
       screen: "ExpenseReport",
       params: undefined,
     },
@@ -193,7 +294,7 @@ export const DashboardScreen = () => {
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: T.bg }]}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -201,47 +302,67 @@ export const DashboardScreen = () => {
             setRefreshing(true);
             fetchStats();
           }}
-          colors={[COLORS.primary]}
+          colors={[T.accent]}
+          tintColor={T.accent}
         />
       }
       showsVerticalScrollIndicator={false}
     >
-      {/* ── Hero Banner ───────────────────────────────── */}
-      <View style={styles.heroBanner}>
+      {/* ── Hero Banner ── */}
+      <View style={[styles.heroBanner, { backgroundColor: T.heroBg }]}>
         <View>
-          <Text style={styles.heroGreeting}>স্বাগতম 👋</Text>
-          <Text style={styles.heroTitle}>PonaTrack</Text>
-          <Text style={styles.heroSub}>পোনা ব্যবসা ম্যানেজমেন্ট</Text>
+          <Text style={[styles.heroGreeting, { color: T.heroSubText }]}>
+            স্বাগতম 👋
+          </Text>
+          <Text style={[styles.heroTitle, { color: T.heroText }]}>
+            PonaTrack
+          </Text>
+          <Text style={[styles.heroSub, { color: T.heroSubText }]}>
+            পোনা ব্যবসা ম্যানেজমেন্ট
+          </Text>
         </View>
         <View style={styles.heroRight}>
           {(s?.activeBatches ?? 0) > 0 && (
             <TouchableOpacity
-              style={styles.activePill}
+              style={[
+                styles.activePill,
+                { backgroundColor: "rgba(108,99,255,0.18)" },
+              ]}
               onPress={() => navigation.navigate("Batches")}
             >
               <View style={styles.activeDot} />
-              <Text style={styles.activePillText}>
+              <Text style={[styles.activePillText, { color: T.heroText }]}>
                 {s!.activeBatches} ব্যাচ চলছে
               </Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            style={styles.notifBtn}
+            style={[
+              styles.notifBtn,
+              { backgroundColor: "rgba(108,99,255,0.18)" },
+            ]}
             onPress={() => navigation.navigate("NotificationScreen")}
           >
             <Ionicons
               name="notifications-outline"
               size={21}
-              color={COLORS.white}
+              color={T.heroText}
             />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── Floating Profit Card ──────────────────────── */}
-      <View style={styles.profitCard}>
+      {/* ── Floating Profit Card ── */}
+      <View
+        style={[
+          styles.profitCard,
+          { backgroundColor: T.surface, shadowColor: T.shadow },
+        ]}
+      >
         <View style={styles.profitLeft}>
-          <Text style={styles.profitLabel}>মোট লাভ / ক্ষতি</Text>
+          <Text style={[styles.profitLabel, { color: T.textSecondary }]}>
+            মোট লাভ / ক্ষতি
+          </Text>
           <Text
             style={[
               styles.profitValue,
@@ -272,32 +393,38 @@ export const DashboardScreen = () => {
             </Text>
           </View>
         </View>
-        <View style={styles.profitDivider} />
+        <View style={[styles.profitDivider, { backgroundColor: T.border }]} />
         <View style={styles.profitRight}>
           <View style={styles.profitMini}>
-            <Text style={styles.profitMiniLabel}>মোট বিক্রয়</Text>
-            <Text style={styles.profitMiniVal}>
+            <Text style={[styles.profitMiniLabel, { color: T.textMuted }]}>
+              মোট বিক্রয়
+            </Text>
+            <Text style={[styles.profitMiniVal, { color: T.textPrimary }]}>
               {formatCurrency(s?.totalSales || 0)}
             </Text>
           </View>
-          <View style={styles.profitMiniDivider} />
+          <View
+            style={[styles.profitMiniDivider, { backgroundColor: T.border }]}
+          />
           <View style={styles.profitMini}>
-            <Text style={styles.profitMiniLabel}>মোট খরচ</Text>
-            <Text style={styles.profitMiniVal}>
+            <Text style={[styles.profitMiniLabel, { color: T.textMuted }]}>
+              মোট খরচ
+            </Text>
+            <Text style={[styles.profitMiniVal, { color: T.textPrimary }]}>
               {formatCurrency(s?.totalExpenses || 0)}
             </Text>
           </View>
         </View>
       </View>
 
-      {/* ── Quick Actions ─────────────────────────────── */}
+      {/* ── Quick Actions ── */}
       <View style={styles.section}>
         <SectionHeader title="দ্রুত কার্যক্রম" />
         <View style={styles.quickRow}>
           <QuickAction
             icon="add-circle-outline"
             label="নতুন অর্ডার"
-            color={COLORS.primary}
+            color={T.accent}
             onPress={() => navigation.navigate("CreateOrder")}
           />
           <QuickAction
@@ -309,19 +436,19 @@ export const DashboardScreen = () => {
           <QuickAction
             icon="wallet-outline"
             label="খরচ যোগ"
-            color={COLORS.warning}
+            color={T.warning}
             onPress={() => navigation.navigate("AddExpense")}
           />
           <QuickAction
             icon="lock-closed-outline"
             label="হিসাব বন্ধ"
-            color={COLORS.danger}
+            color={T.danger}
             onPress={() => navigation.navigate("DailyClosing")}
           />
         </View>
       </View>
 
-      {/* ── Key Stats 2×2 ────────────────────────────── */}
+      {/* ── Key Stats 2×2 ── */}
       <View style={styles.section}>
         <SectionHeader
           title="মূল পরিসংখ্যান"
@@ -333,8 +460,8 @@ export const DashboardScreen = () => {
             title="মোট অর্ডার"
             value={formatNumber(s?.totalOrders || 0)}
             icon="receipt-outline"
-            color={COLORS.primary}
-            bg={COLORS.successLight}
+            color={T.accent}
+            bg={T.successSoft}
             onPress={() => navigation.navigate("Orders")}
           />
           <MiniCard
@@ -342,7 +469,7 @@ export const DashboardScreen = () => {
             value={formatNumber(s?.totalPLDelivered || 0)}
             icon="fish-outline"
             color="#1E88E5"
-            bg="#E3F2FD"
+            bg="#1E88E518"
             onPress={() => navigation.navigate("Batches")}
           />
           <MiniCard
@@ -350,20 +477,20 @@ export const DashboardScreen = () => {
             value={formatCurrency(s?.totalCollections || 0)}
             icon="cash-outline"
             color="#43A047"
-            bg="#E8F5E9"
+            bg="#43A04718"
           />
           <MiniCard
             title="মোট বাকি"
             value={formatCurrency(s?.totalDue || 0)}
             icon="alert-circle-outline"
-            color={COLORS.danger}
-            bg={COLORS.dangerLight}
+            color={T.danger}
+            bg={T.dangerSoft}
             onPress={() => navigation.navigate("CustomerDueReport")}
           />
         </View>
       </View>
 
-      {/* ── Mir Row ──────────────────────────────────── */}
+      {/* ── Mir Row ── */}
       <View style={styles.section}>
         <SectionHeader title="মীর / শর্টেজ" />
         <View style={styles.mirRow}>
@@ -373,7 +500,7 @@ export const DashboardScreen = () => {
             sub="মোট ঘাটতি"
             icon="cube-outline"
             color="#7B1FA2"
-            bg="#F3E5F5"
+            bg="#7B1FA218"
           />
           <WideCard
             title="কাউন্টিং মীর"
@@ -381,12 +508,12 @@ export const DashboardScreen = () => {
             sub="গণনা পার্থক্য"
             icon="calculator-outline"
             color="#00838F"
-            bg="#E0F7FA"
+            bg="#00838F18"
           />
         </View>
       </View>
 
-      {/* ── Chart ────────────────────────────────────── */}
+      {/* ── Chart ── */}
       {s?.dailySales && s.dailySales.length > 0 && (
         <View style={styles.section}>
           <SectionHeader
@@ -394,7 +521,12 @@ export const DashboardScreen = () => {
             actionLabel="রিপোর্ট"
             onAction={() => navigation.navigate("Reports")}
           />
-          <View style={styles.chartCard}>
+          <View
+            style={[
+              styles.chartCard,
+              { backgroundColor: T.surface, shadowColor: T.shadow },
+            ]}
+          >
             <LineChart
               data={{
                 labels: s.dailySales.map((d: any) => d.date.slice(5)),
@@ -413,7 +545,7 @@ export const DashboardScreen = () => {
         </View>
       )}
 
-      {/* ── Report Shortcuts 2×3 ─────────────────────── */}
+      {/* ── Report Shortcuts 2×3 ── */}
       <View style={styles.section}>
         <SectionHeader title="রিপোর্ট শর্টকাট" />
         <View style={styles.reportGrid}>
@@ -434,33 +566,23 @@ export const DashboardScreen = () => {
   );
 };
 
+// ─── Styles (color-neutral) ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F2F6F2" },
+  container: { flex: 1 },
 
-  /* Loading */
-  loadingBox: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F2F6F2",
-  },
+  // Loading
+  loadingBox: { flex: 1, alignItems: "center", justifyContent: "center" },
   loadingLogo: {
     width: 80,
     height: 80,
     borderRadius: 20,
-    backgroundColor: COLORS.successLight,
     alignItems: "center",
     justifyContent: "center",
   },
-  loadingText: {
-    color: COLORS.textSecondary,
-    marginTop: 10,
-    fontWeight: "600",
-  },
+  loadingText: { marginTop: 10, fontWeight: "600" },
 
-  /* Hero */
+  // Hero
   heroBanner: {
-    backgroundColor: COLORS.primary,
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 30,
@@ -468,19 +590,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  heroGreeting: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.7)",
-    fontWeight: "500",
-  },
-  heroTitle: { fontSize: 26, fontWeight: "900", color: COLORS.white },
-  heroSub: { fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 1 },
+  heroGreeting: { fontSize: 12, fontWeight: "500" },
+  heroTitle: { fontSize: 26, fontWeight: "900" },
+  heroSub: { fontSize: 11, marginTop: 1 },
   heroRight: { alignItems: "flex-end", gap: 8 },
   activePill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: "rgba(255,255,255,0.2)",
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -491,19 +608,17 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "#69FF85",
   },
-  activePillText: { color: COLORS.white, fontSize: 11, fontWeight: "700" },
+  activePillText: { fontSize: 11, fontWeight: "700" },
   notifBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
   },
 
-  /* Profit Float Card */
+  // Profit card
   profitCard: {
-    backgroundColor: COLORS.white,
     marginHorizontal: 16,
     marginTop: -18,
     borderRadius: 18,
@@ -511,13 +626,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     elevation: 8,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 12,
   },
   profitLeft: { flex: 1, gap: 6 },
-  profitLabel: { fontSize: 11, color: COLORS.textSecondary, fontWeight: "500" },
+  profitLabel: { fontSize: 11, fontWeight: "500" },
   profitValue: { fontSize: 26, fontWeight: "900" },
   profitBadge: {
     flexDirection: "row",
@@ -529,19 +643,14 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   profitBadgeText: { fontSize: 11, fontWeight: "700" },
-  profitDivider: {
-    width: 1,
-    height: "80%",
-    backgroundColor: COLORS.border,
-    marginHorizontal: 14,
-  },
+  profitDivider: { width: 1, height: "80%", marginHorizontal: 14 },
   profitRight: { gap: 8 },
   profitMini: { alignItems: "flex-end" },
-  profitMiniLabel: { fontSize: 10, color: COLORS.textMuted },
-  profitMiniVal: { fontSize: 13, fontWeight: "800", color: COLORS.text },
-  profitMiniDivider: { height: 1, backgroundColor: COLORS.border },
+  profitMiniLabel: { fontSize: 10 },
+  profitMiniVal: { fontSize: 13, fontWeight: "800" },
+  profitMiniDivider: { height: 1 },
 
-  /* Section */
+  // Section
   section: { paddingHorizontal: 16, paddingTop: 20 },
   sectionHeader: {
     flexDirection: "row",
@@ -549,10 +658,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-  sectionTitle: { fontSize: 14, fontWeight: "800", color: COLORS.text },
-  sectionAction: { fontSize: 12, fontWeight: "700", color: COLORS.primary },
+  sectionTitle: { fontSize: 14, fontWeight: "800" },
+  sectionAction: { fontSize: 12, fontWeight: "700" },
 
-  /* Quick Actions */
+  // Quick actions
   quickRow: { flexDirection: "row", gap: 8 },
   quickBtn: { flex: 1, alignItems: "center", gap: 6 },
   quickIcon: {
@@ -562,21 +671,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  quickLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: COLORS.textSecondary,
-    textAlign: "center",
-  },
+  quickLabel: { fontSize: 10, fontWeight: "700", textAlign: "center" },
 
-  /* Mini Cards 2×2 */
+  // Mini cards
   miniGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   miniCard: {
-    backgroundColor: COLORS.white,
     borderRadius: 14,
     padding: 14,
     elevation: 2,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
@@ -589,26 +691,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 10,
   },
-  miniCardTitle: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-    fontWeight: "500",
-    marginBottom: 4,
-  },
+  miniCardTitle: { fontSize: 11, fontWeight: "500", marginBottom: 4 },
   miniCardValue: { fontSize: 17, fontWeight: "900" },
 
-  /* Mir Row */
+  // Wide cards (Mir)
   mirRow: { gap: 10 },
   wideCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    backgroundColor: COLORS.white,
     borderRadius: 14,
     padding: 14,
     borderLeftWidth: 4,
     elevation: 2,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
@@ -620,35 +715,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  wideCardTitle: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-    fontWeight: "500",
-  },
+  wideCardTitle: { fontSize: 11, fontWeight: "500" },
   wideCardValue: { fontSize: 19, fontWeight: "900", marginTop: 2 },
-  wideCardSub: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
+  wideCardSub: { fontSize: 11, marginTop: 1 },
 
-  /* Chart */
+  // Chart
   chartCard: {
-    backgroundColor: COLORS.white,
     borderRadius: 14,
     padding: 14,
     elevation: 2,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
     overflow: "hidden",
   },
 
-  /* Report Cards 2×3 */
+  // Report cards
   reportGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   reportCard: {
-    backgroundColor: COLORS.white,
     borderRadius: 14,
     padding: 14,
     elevation: 2,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
@@ -662,12 +749,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  reportCardLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.text,
-    lineHeight: 18,
-  },
+  reportCardLabel: { fontSize: 13, fontWeight: "700", lineHeight: 18 },
   reportCardArrow: {
     width: 26,
     height: 26,
