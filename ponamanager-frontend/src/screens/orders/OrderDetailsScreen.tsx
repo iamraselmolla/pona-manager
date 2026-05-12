@@ -8,37 +8,163 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  useColorScheme,
+  StatusBar,
+  SafeAreaView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { orderAPI } from "../../api/services";
 import { Order } from "../../types";
-import { COLORS, ORDER_STATUS } from "../../constants";
+import { ORDER_STATUS } from "../../constants";
 import {
   formatCurrency,
   formatDate,
   getPonaTypeColor,
 } from "../../utils/helpers";
 
+// ─── Theme ────────────────────────────────────────────────────────────────────
+const lightTheme = {
+  bg: "#F5F4F0",
+  surface: "#FFFFFF",
+  surface2: "#F0EEE9",
+  text: "#1A1916",
+  text2: "#6B6A65",
+  text3: "#A8A7A2",
+  border: "rgba(26,25,22,0.09)",
+  border2: "rgba(26,25,22,0.16)",
+  accent: "#1E5FCC",
+  accentBg: "#EAF1FC",
+  success: "#15803D",
+  successBg: "#F0FBF4",
+  danger: "#B91C1C",
+  dangerBg: "#FEF2F2",
+  warning: "#B45309",
+  warningBg: "#FEF9EE",
+};
+
+const darkTheme = {
+  bg: "#111110",
+  surface: "#1C1C1B",
+  surface2: "#252523",
+  text: "#F0EDE8",
+  text2: "#9A9892",
+  text3: "#5C5B57",
+  border: "rgba(240,237,232,0.08)",
+  border2: "rgba(240,237,232,0.15)",
+  accent: "#6096F0",
+  accentBg: "#0F1F3A",
+  success: "#4ADE80",
+  successBg: "#052010",
+  danger: "#F87171",
+  dangerBg: "#200A0A",
+  warning: "#FBD073",
+  warningBg: "#1C1000",
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 const DEFAULT_STATUS = { label: "Unknown", bg: "#F3F4F6", color: "#6B7280" };
 const getSafeStatus = (s: string) =>
   (
     ORDER_STATUS as Record<string, { label: string; bg: string; color: string }>
   )[s] ?? DEFAULT_STATUS;
 
-const Row = ({ label, value, valueStyle }: any) => (
-  <View style={styles.row}>
-    <Text style={styles.rowLabel}>{label}</Text>
-    <Text style={[styles.rowValue, valueStyle]}>{value}</Text>
+// ─── Sub-components ───────────────────────────────────────────────────────────
+const SectionHeader = ({
+  label,
+  theme,
+}: {
+  label: string;
+  theme: typeof lightTheme;
+}) => (
+  <View
+    style={{
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingTop: 20,
+      paddingBottom: 10,
+      gap: 10,
+    }}
+  >
+    <Text
+      style={{
+        fontSize: 10,
+        fontWeight: "800",
+        textTransform: "uppercase",
+        letterSpacing: 0.8,
+        color: theme.text3,
+      }}
+    >
+      {label}
+    </Text>
+    <View
+      style={{
+        flex: 1,
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: theme.border2,
+      }}
+    />
   </View>
 );
 
+const InfoRow = ({
+  icon,
+  label,
+  value,
+  valueColor,
+  valueFontSize = 13,
+  last = false,
+  theme,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  valueColor?: string;
+  valueFontSize?: number;
+  last?: boolean;
+  theme: typeof lightTheme;
+}) => (
+  <View
+    style={{
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 18,
+      paddingVertical: 13,
+      borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth,
+      borderBottomColor: theme.border,
+    }}
+  >
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+      <Ionicons name={icon} size={15} color={theme.text3} />
+      <Text style={{ fontSize: 13, color: theme.text2 }}>{label}</Text>
+    </View>
+    <Text
+      style={{
+        fontSize: valueFontSize,
+        fontWeight: valueFontSize > 13 ? "700" : "600",
+        color: valueColor ?? theme.text,
+        maxWidth: 190,
+        textAlign: "right",
+      }}
+      numberOfLines={2}
+    >
+      {value}
+    </Text>
+  </View>
+);
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export const OrderDetailsScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { orderId } = route.params;
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === "dark" ? darkTheme : lightTheme;
 
   useEffect(() => {
     orderAPI
@@ -73,184 +199,507 @@ export const OrderDetailsScreen = () => {
     ]);
   };
 
-  if (loading)
+  if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: theme.bg,
+        }}
+      >
+        <ActivityIndicator size="large" color={theme.accent} />
       </View>
     );
+  }
+
   if (!order) return null;
 
   const status = getSafeStatus(order.status);
-  const typeColor = getPonaTypeColor(order.ponaType) ?? COLORS.primary;
+  const typeColor = getPonaTypeColor(order.ponaType) ?? theme.accent;
+  const isDue = (order.dueAmount ?? 0) > 0;
+  const canAct = order.status !== "cancelled" && order.status !== "delivered";
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={[styles.header, { borderTopColor: typeColor }]}>
-        <View style={styles.headerTop}>
-          <View
-            style={[styles.typeBadge, { backgroundColor: typeColor + "20" }]}
-          >
-            <Text style={[styles.typeBadgeText, { color: typeColor }]}>
-              {order.ponaType}
-            </Text>
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-            <Text style={[styles.statusText, { color: status.color }]}>
-              {status.label}
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.quantity}>
-          {(order.plQuantity ?? 0).toLocaleString()} PL
-        </Text>
-        <Text style={styles.customerName}>{order.customerName}</Text>
-        <Text style={styles.mobile}>{order.customerMobile}</Text>
-      </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
+      <StatusBar
+        barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
+        backgroundColor={theme.bg}
+      />
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Order Information</Text>
-        <Row label="Address" value={order.customerAddress || "-"} />
-        <Row label="Delivery Date" value={formatDate(order.deliveryDate)} />
-        <Row label="Unit Rate" value={formatCurrency(order.unitRate)} />
-        <Row
-          label="Total Price"
-          value={formatCurrency(order.totalPrice)}
-          valueStyle={{ fontWeight: "800", color: COLORS.primary }}
-        />
-        {order.notes && <Row label="Notes" value={order.notes} />}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Payment Information</Text>
-        <Row
-          label="Advance Paid"
-          value={formatCurrency(order.advanceAmount)}
-          valueStyle={{ color: COLORS.success }}
-        />
-        <Row
-          label="Due Amount"
-          value={formatCurrency(order.dueAmount)}
-          valueStyle={{
-            color: (order.dueAmount ?? 0) > 0 ? COLORS.danger : COLORS.success,
-            fontWeight: "800",
+      {/* ── Top Bar ── */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: theme.border,
+          backgroundColor: theme.bg,
+        }}
+      >
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: theme.surface,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: theme.border2,
+            alignItems: "center",
+            justifyContent: "center",
           }}
-        />
+        >
+          <Ionicons name="arrow-back" size={18} color={theme.text} />
+        </TouchableOpacity>
+        <Text
+          style={{
+            fontSize: 14,
+            fontWeight: "600",
+            color: theme.text2,
+            letterSpacing: 0.3,
+          }}
+        >
+          Order Details
+        </Text>
+        <TouchableOpacity
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: theme.surface,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: theme.border2,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons name="ellipsis-vertical" size={18} color={theme.text} />
+        </TouchableOpacity>
       </View>
 
-      {order.status !== "cancelled" && order.status !== "delivered" && (
-        <View style={styles.actionsCard}>
-          <TouchableOpacity
-            style={styles.deliveryBtn}
-            onPress={() => navigation.navigate("DeliveryEntry", { orderId })}
-          >
-            <Ionicons name="boat-outline" size={18} color={COLORS.white} />
-            <Text style={styles.deliveryBtnText}>Record Delivery</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
-            <Ionicons
-              name="close-circle-outline"
-              size={18}
-              color={COLORS.danger}
-            />
-            <Text style={styles.cancelBtnText}>Cancel Order</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Hero Card ── */}
+        <View
+          style={{
+            marginHorizontal: 16,
+            marginTop: 14,
+            backgroundColor: theme.surface,
+            borderRadius: 20,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: theme.border,
+            overflow: "hidden",
+          }}
+        >
+          {/* Type color stripe */}
+          <View style={{ height: 5, backgroundColor: typeColor }} />
 
-      <Text style={styles.orderId}>Order ID: {order.id}</Text>
-      <Text style={styles.createdAt}>
-        Created: {formatDate(order.createdAt)}
-      </Text>
-      <View style={{ height: 30 }} />
-    </ScrollView>
+          <View style={{ padding: 20 }}>
+            {/* Badges row */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 16,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                  backgroundColor: typeColor + "18",
+                  borderRadius: 20,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                }}
+              >
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: typeColor,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: typeColor,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.3,
+                  }}
+                >
+                  {order.ponaType}
+                </Text>
+              </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                  backgroundColor: status.bg,
+                  borderRadius: 20,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                }}
+              >
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: status.color,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: status.color,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.3,
+                  }}
+                >
+                  {status.label}
+                </Text>
+              </View>
+            </View>
+
+            {/* Quantity — hero number */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "baseline",
+                gap: 6,
+                marginBottom: 6,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 52,
+                  fontWeight: "900",
+                  color: theme.text,
+                  letterSpacing: -2,
+                  lineHeight: 56,
+                }}
+              >
+                {(order.plQuantity ?? 0).toLocaleString()}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: "500",
+                  color: theme.text2,
+                  marginBottom: 4,
+                }}
+              >
+                PL
+              </Text>
+            </View>
+
+            {/* Customer */}
+            <Text
+              style={{
+                fontSize: 17,
+                fontWeight: "700",
+                color: theme.text,
+                marginBottom: 3,
+              }}
+            >
+              {order.customerName}
+            </Text>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 5 }}
+            >
+              <Ionicons name="call-outline" size={13} color={theme.text3} />
+              <Text style={{ fontSize: 13, color: theme.text3 }}>
+                {order.customerMobile}
+              </Text>
+            </View>
+
+            {/* Divider */}
+            <View
+              style={{
+                height: StyleSheet.hairlineWidth,
+                backgroundColor: theme.border,
+                marginVertical: 16,
+              }}
+            />
+
+            {/* Quick meta */}
+            <View style={{ flexDirection: "row", gap: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: "800",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                    color: theme.text3,
+                    marginBottom: 3,
+                  }}
+                >
+                  Delivery
+                </Text>
+                <Text
+                  style={{ fontSize: 14, fontWeight: "600", color: theme.text }}
+                >
+                  {formatDate(order.deliveryDate)}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: "800",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                    color: theme.text3,
+                    marginBottom: 3,
+                  }}
+                >
+                  Unit Rate
+                </Text>
+                <Text
+                  style={{ fontSize: 14, fontWeight: "600", color: theme.text }}
+                >
+                  {formatCurrency(order.unitRate)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Order Information ── */}
+        <SectionHeader label="Order Info" theme={theme} />
+        <View
+          style={{
+            marginHorizontal: 16,
+            backgroundColor: theme.surface,
+            borderRadius: 16,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: theme.border,
+            overflow: "hidden",
+          }}
+        >
+          <InfoRow
+            icon="location-outline"
+            label="Address"
+            value={order.customerAddress || "—"}
+            theme={theme}
+          />
+          {order.notes ? (
+            <InfoRow
+              icon="document-text-outline"
+              label="Notes"
+              value={order.notes}
+              valueColor={theme.text2}
+              theme={theme}
+            />
+          ) : null}
+          <InfoRow
+            icon="receipt-outline"
+            label="Total Price"
+            value={formatCurrency(order.totalPrice)}
+            valueColor={theme.accent}
+            valueFontSize={15}
+            last
+            theme={theme}
+          />
+        </View>
+
+        {/* ── Payment ── */}
+        <SectionHeader label="Payment" theme={theme} />
+        <View
+          style={{
+            marginHorizontal: 16,
+            backgroundColor: theme.surface,
+            borderRadius: 16,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: theme.border,
+            overflow: "hidden",
+          }}
+        >
+          <View style={{ flexDirection: "row" }}>
+            {/* Advance */}
+            <View
+              style={{
+                flex: 1,
+                padding: 18,
+                borderRightWidth: StyleSheet.hairlineWidth,
+                borderRightColor: theme.border,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontWeight: "800",
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  color: theme.text3,
+                  marginBottom: 6,
+                }}
+              >
+                Advance Paid
+              </Text>
+              <Text
+                style={{
+                  fontSize: 22,
+                  fontWeight: "800",
+                  color: theme.success,
+                }}
+              >
+                {formatCurrency(order.advanceAmount)}
+              </Text>
+              <Text style={{ fontSize: 11, color: theme.text3, marginTop: 2 }}>
+                Received
+              </Text>
+            </View>
+            {/* Due */}
+            <View style={{ flex: 1, padding: 18 }}>
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontWeight: "800",
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  color: theme.text3,
+                  marginBottom: 6,
+                }}
+              >
+                Due Amount
+              </Text>
+              <Text
+                style={{
+                  fontSize: 22,
+                  fontWeight: "800",
+                  color: isDue ? theme.danger : theme.success,
+                }}
+              >
+                {formatCurrency(order.dueAmount)}
+              </Text>
+              <Text style={{ fontSize: 11, color: theme.text3, marginTop: 2 }}>
+                {isDue ? "Outstanding" : "Cleared"}
+              </Text>
+            </View>
+          </View>
+
+          {/* Due warning banner */}
+          {isDue && (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                backgroundColor: theme.dangerBg,
+                paddingHorizontal: 18,
+                paddingVertical: 10,
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: theme.border,
+              }}
+            >
+              <Ionicons
+                name="alert-circle-outline"
+                size={15}
+                color={theme.danger}
+              />
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: theme.danger,
+                  fontWeight: "600",
+                  flex: 1,
+                }}
+              >
+                {formatCurrency(order.dueAmount)} due before delivery
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* ── Actions ── */}
+        {canAct && (
+          <>
+            <SectionHeader label="Actions" theme={theme} />
+            <View style={{ marginHorizontal: 16, gap: 10 }}>
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate("DeliveryEntry", { orderId })
+                }
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  backgroundColor: theme.accent,
+                  borderRadius: 16,
+                  paddingVertical: 16,
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="boat-outline" size={18} color="#FFFFFF" />
+                <Text
+                  style={{ color: "#FFFFFF", fontSize: 15, fontWeight: "700" }}
+                >
+                  Record Delivery
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleCancel}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  borderWidth: 1.5,
+                  borderColor: theme.danger,
+                  borderRadius: 16,
+                  paddingVertical: 14,
+                  backgroundColor: "transparent",
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons
+                  name="close-circle-outline"
+                  size={18}
+                  color={theme.danger}
+                />
+                <Text
+                  style={{
+                    color: theme.danger,
+                    fontSize: 14,
+                    fontWeight: "700",
+                  }}
+                >
+                  Cancel Order
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {/* ── Footer meta ── */}
+        <View style={{ alignItems: "center", paddingTop: 24, gap: 3 }}>
+          <Text style={{ fontSize: 11, color: theme.text3 }}>
+            Order ID: {order.id}
+          </Text>
+          <Text style={{ fontSize: 11, color: theme.text3 }}>
+            Created: {formatDate(order.createdAt)}
+          </Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  header: {
-    backgroundColor: COLORS.white,
-    padding: 20,
-    borderTopWidth: 4,
-    marginBottom: 12,
-    elevation: 2,
-  },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  typeBadge: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
-  typeBadgeText: { fontSize: 12, fontWeight: "700" },
-  statusBadge: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
-  statusText: { fontSize: 12, fontWeight: "700" },
-  quantity: { fontSize: 32, fontWeight: "900", color: COLORS.text },
-  customerName: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.text,
-    marginTop: 4,
-  },
-  mobile: { fontSize: 14, color: COLORS.textSecondary },
-  card: {
-    backgroundColor: COLORS.white,
-    marginHorizontal: 12,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 1,
-  },
-  cardTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: COLORS.textSecondary,
-    marginBottom: 12,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border + "80",
-  },
-  rowLabel: { fontSize: 13, color: COLORS.textSecondary },
-  rowValue: { fontSize: 13, fontWeight: "600", color: COLORS.text },
-  actionsCard: { marginHorizontal: 12, gap: 10, marginBottom: 12 },
-  deliveryBtn: {
-    flexDirection: "row",
-    gap: 6,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.primary,
-    borderRadius: 10,
-    padding: 14,
-  },
-  deliveryBtnText: { color: COLORS.white, fontWeight: "700", fontSize: 15 },
-  cancelBtn: {
-    flexDirection: "row",
-    gap: 6,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: COLORS.danger,
-    borderRadius: 10,
-    padding: 12,
-  },
-  cancelBtnText: { color: COLORS.danger, fontWeight: "700", fontSize: 14 },
-  orderId: {
-    textAlign: "center",
-    color: COLORS.textMuted,
-    fontSize: 11,
-    marginTop: 8,
-  },
-  createdAt: {
-    textAlign: "center",
-    color: COLORS.textMuted,
-    fontSize: 11,
-    marginTop: 2,
-  },
-});
