@@ -11,6 +11,7 @@ import {
   useColorScheme,
   StatusBar,
   SafeAreaView,
+  Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -22,6 +23,7 @@ import {
   formatDate,
   getPonaTypeColor,
 } from "../../utils/helpers";
+import { batchAPI } from "../../api/batchServices";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const lightTheme = {
@@ -171,6 +173,12 @@ export const OrderDetailsScreen = () => {
       .getById(orderId)
       .then((res) => {
         setOrder(res.data.data);
+        orderAPI.getById(orderId).then((res) => {
+          const data = res.data.data;
+          console.log("FULL ORDER DATA:", JSON.stringify(data, null, 2));
+          setOrder(data);
+          setLoading(false);
+        });
         setLoading(false);
       })
       .catch(() => {
@@ -179,24 +187,28 @@ export const OrderDetailsScreen = () => {
       });
   }, [orderId]);
 
-  const handleCancel = () => {
-    Alert.alert("Cancel Order", "Are you sure you want to cancel this order?", [
-      { text: "No", style: "cancel" },
-      {
-        text: "Yes, Cancel",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await orderAPI.cancel(orderId);
-            setOrder((prev) =>
-              prev ? { ...prev, status: "cancelled" } : null,
-            );
-          } catch {
-            Alert.alert("Error", "Failed to cancel order");
-          }
-        },
-      },
-    ]);
+  const handleCancel = async () => {
+    const isInBatch = order.status === "in_batch";
+    console.log("order.id:", order.id);
+    console.log("order.batchId:", order.batchId);
+
+    try {
+      if (isInBatch && order.batchId) {
+        console.log("Removing from batch...");
+        const unbatch = await batchAPI.removeOrder(order.batchId, order.id);
+        console.log("Unbatch result:", JSON.stringify(unbatch?.data));
+      }
+
+      console.log("Cancelling order...");
+      const result = await orderAPI.cancel(orderId);
+      console.log("Cancel result:", JSON.stringify(result?.data));
+
+      setOrder((prev) => (prev ? { ...prev, status: "cancelled" } : null));
+      navigation.goBack();
+    } catch (e: any) {
+      console.error("Failed URL:", e?.config?.url);
+      console.error("Failed:", JSON.stringify(e?.response?.data));
+    }
   };
 
   if (loading) {
@@ -220,6 +232,10 @@ export const OrderDetailsScreen = () => {
   const typeColor = getPonaTypeColor(order.ponaType) ?? theme.accent;
   const isDue = (order.dueAmount ?? 0) > 0;
   const canAct = order.status !== "cancelled" && order.status !== "delivered";
+
+  console.log("STATUS:", order.status);
+  console.log("canAct:", canAct);
+  console.log("RENDERING ACTIONS:", canAct);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
@@ -633,20 +649,20 @@ export const OrderDetailsScreen = () => {
           <>
             <SectionHeader label="Actions" theme={theme} />
             <View style={{ marginHorizontal: 16, gap: 10 }}>
-              <TouchableOpacity
+              <Pressable
                 onPress={() =>
                   navigation.navigate("DeliveryEntry", { orderId })
                 }
-                style={{
+                style={({ pressed }) => ({
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 8,
-                  backgroundColor: theme.accent,
+                  backgroundColor: pressed ? theme.accent + "CC" : theme.accent,
                   borderRadius: 16,
                   paddingVertical: 16,
-                }}
-                activeOpacity={0.85}
+                  opacity: pressed ? 0.85 : 1,
+                })}
               >
                 <Ionicons name="boat-outline" size={18} color="#FFFFFF" />
                 <Text
@@ -654,11 +670,11 @@ export const OrderDetailsScreen = () => {
                 >
                   Record Delivery
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
 
-              <TouchableOpacity
+              <Pressable
                 onPress={handleCancel}
-                style={{
+                style={({ pressed }) => ({
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "center",
@@ -667,9 +683,8 @@ export const OrderDetailsScreen = () => {
                   borderColor: theme.danger,
                   borderRadius: 16,
                   paddingVertical: 14,
-                  backgroundColor: "transparent",
-                }}
-                activeOpacity={0.85}
+                  backgroundColor: pressed ? theme.dangerBg : "transparent",
+                })}
               >
                 <Ionicons
                   name="close-circle-outline"
@@ -685,7 +700,7 @@ export const OrderDetailsScreen = () => {
                 >
                   Cancel Order
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </>
         )}
