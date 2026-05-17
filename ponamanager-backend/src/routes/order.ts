@@ -74,16 +74,57 @@ router.get("/:id", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const order = await prisma.order.create({ data: req.body });
-    // Update customer running order flag
-    if (req.body.customerId) {
-      await prisma.customer.update({
-        where: { id: req.body.customerId },
-        data: { hasRunningOrder: true, totalOrders: { increment: 1 } },
+    const {
+      customerId,
+      customerName,
+      customerMobile,
+      customerAddress,
+      ...orderData
+    } = req.body;
+
+    let resolvedCustomerId = customerId;
+
+    // If no customerId, find or create customer by mobile
+    if (!resolvedCustomerId && customerMobile) {
+      let customer = await prisma.customer.findUnique({
+        where: { mobile: customerMobile },
       });
+
+      if (!customer) {
+        customer = await prisma.customer.create({
+          data: {
+            name: customerName || "Unknown",
+            mobile: customerMobile,
+            address: customerAddress || "",
+          },
+        });
+      }
+
+      resolvedCustomerId = customer.id;
     }
+
+    if (!resolvedCustomerId) {
+      return res.status(400).json({ success: false, message: "Customer info required" });
+    }
+
+    const order = await prisma.order.create({
+      data: {
+        ...orderData,
+        customerId: resolvedCustomerId,
+        customerName: customerName || "",
+        customerMobile: customerMobile || "",
+        customerAddress: customerAddress || "",
+      },
+    });
+
+    await prisma.customer.update({
+      where: { id: resolvedCustomerId },
+      data: { hasRunningOrder: true, totalOrders: { increment: 1 } },
+    });
+
     res.status(201).json({ success: true, data: order });
-  } catch {
+  } catch (e) {
+    console.error(e);
     res.status(500).json({ success: false, message: "Failed to create order" });
   }
 });
