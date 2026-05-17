@@ -40,3 +40,8 @@ app-example
 # generated native folders
 /ios
 /android
+
+
+# logslogs
+*.log
+logs/
