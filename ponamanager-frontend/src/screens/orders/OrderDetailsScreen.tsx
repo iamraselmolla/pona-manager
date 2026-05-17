@@ -156,6 +156,60 @@ const InfoRow = ({
     </Text>
   </View>
 );
+// Cancel order
+const handleCancel = async () => {
+  const isInBatch = order.status === "in_batch";
+  showAlert(
+    "Cancel Order",
+    isInBatch
+      ? "This order is in a batch. It will be removed from the batch first."
+      : "Are you sure you want to cancel this order?",
+    async () => {
+      try {
+        if (isInBatch && order.batchId) {
+          await batchAPI.removeOrder(order.batchId, order.id);
+        }
+        await orderAPI.cancel(orderId);
+        setOrder((prev) => prev ? { ...prev, status: "cancelled" } : null);
+      } catch (e: any) {
+        showAlert("Error", e?.response?.data?.message || "Failed to cancel order");
+      }
+    }
+  );
+};
+const showAlert = (title: string, message: string, onConfirm?: () => void, onCancel?: () => void) => {
+  if (typeof window !== "undefined" && window.confirm) {
+    // Web
+    const confirmed = onConfirm ? window.confirm(`${title}\n\n${message}`) : window.alert(`${title}\n\n${message}`);
+    if (confirmed && onConfirm) onConfirm();
+    if (!confirmed && onCancel) onCancel();
+  } else {
+    // Native
+    Alert.alert(title, message,
+      onConfirm ? [
+        { text: "No", style: "cancel", onPress: onCancel },
+        { text: "Yes", style: "destructive", onPress: onConfirm },
+      ] : [{ text: "OK" }]
+    );
+  }
+};
+
+// Delete order
+const handleDelete = async (orderId: string) => {
+  showAlert(
+    "Delete Order",
+    "This will permanently delete this cancelled order. Cannot be undone.",
+    async () => {
+      try {
+        await orderAPI.delete(orderId);
+        navigation.reset({ index: 0, routes: [{ name: "Orders" }] });
+      } catch (e: any) {
+        showAlert("Error", e?.response?.data?.message || "Failed to delete order");
+      }
+    }
+  );
+};
+
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export const OrderDetailsScreen = () => {
@@ -704,6 +758,30 @@ export const OrderDetailsScreen = () => {
             </View>
           </>
         )}
+        {order.status === "cancelled" && (
+  <>
+
+    <View style={{ marginHorizontal: 16, gap: 10, marginTop: 20 }}>
+      <Pressable
+        onPress={() => handleDelete(order.id)}
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          backgroundColor: pressed ? "#7F1D1D" : "#991B1B",
+          borderRadius: 16,
+          paddingVertical: 14,
+        })}
+      >
+        <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+        <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "700" }}>
+          Delete Order Permanently
+        </Text>
+      </Pressable>
+    </View>
+  </>
+)}
 
         {/* ── Footer meta ── */}
         <View style={{ alignItems: "center", paddingTop: 24, gap: 3 }}>

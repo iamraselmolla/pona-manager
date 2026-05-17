@@ -167,27 +167,46 @@ router.patch("/:id/cancel", async (req, res) => {
   }
 });
 
-// Delete order - only for admin
+// Only cancelled orders can be deleted to maintain data integrity and accurate customer stats
+
 router.delete("/:id", async (req, res) => {
   try {
-    const existing = await prisma.order.findUnique({
+    const order = await prisma.order.findUnique({
       where: { id: req.params.id },
     });
-    if (!existing)
-      return res
-        .status(404)
-        .json({ success: false, message: "Order not found" });
 
-    if (existing.status !== "cancelled") {
-      return res.status(400).json({
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    if (order.status !== "cancelled") {
+      return res.status(403).json({
         success: false,
-        message: "Only cancelled orders can be permanently deleted",
+        message: "Only cancelled orders can be deleted",
       });
     }
 
     await prisma.order.delete({ where: { id: req.params.id } });
+
+    if (order.customerId) {
+      const runningCount = await prisma.order.count({
+        where: {
+          customerId: order.customerId,
+          status: { notIn: ["cancelled", "delivered"] },
+        },
+      });
+
+      await prisma.customer.update({
+        where: { id: order.customerId },
+        data: {
+          totalOrders: { decrement: 1 },
+          hasRunningOrder: runningCount > 0,
+        },
+      });
+    }
+
     res.json({ success: true, message: "Order deleted" });
-  } catch {
+  } catch (e) {
     res.status(500).json({ success: false, message: "Failed to delete order" });
   }
 });

@@ -86,6 +86,8 @@ export const orderAPI = {
     apiClient.get<ApiResponse<PaginatedResponse<Order>>>("/orders", { params }),
 
   getById: (id: string) => apiClient.get<ApiResponse<Order>>(`/orders/${id}`),
+  delete: (id: string) =>
+  apiClient.delete<ApiResponse<Order>>(`/orders/${id}`),
 
   getSchedule: (date: string) =>
     apiClient.get<ApiResponse<Order[]>>("/orders/schedule", {
