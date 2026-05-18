@@ -428,4 +428,41 @@ router.patch("/:id/complete", async (req, res) => {
   }
 });
 
+// All orders in batch → released back to pending
+router.delete('/:id', async (req, res) => {
+  try {
+    const batch = await prisma.batch.findUnique({
+      where: { id: req.params.id },
+      include: { batchOrders: true },
+    });
+    if (!batch) return res.status(404).json({ success: false, message: 'Batch not found' });
+ 
+    // Cannot delete completed batch
+    if (batch.status === 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: 'সম্পন্ন ব্যাচ মুছে ফেলা যাবে না',
+      });
+    }
+ 
+    await prisma.$transaction(async (tx) => {
+      // Release all orders back to pending
+      const orderIds = batch.batchOrders.map((bo) => bo.orderId);
+      if (orderIds.length > 0) {
+        await tx.order.updateMany({
+          where: { id: { in: orderIds } },
+          data: { status: 'pending', batchId: null },
+        });
+      }
+      // Delete batch (cascade deletes batchOrders + batchExpenses)
+      await tx.batch.delete({ where: { id: req.params.id } });
+    });
+ 
+    res.json({ success: true, message: 'Batch deleted. All orders released.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to delete batch' });
+  }
+});
+
 export { router as batchRoutes };

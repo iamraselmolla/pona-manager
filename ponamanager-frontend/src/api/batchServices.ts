@@ -63,4 +63,7 @@ export const batchAPI = {
   // Monthly batch report
   getMonthlyReport: (month: string) =>
     apiClient.get<ApiResponse<any>>(`/batches/monthly/${month}`),
+
+   deleteBatch: (batchId: string) =>
+    apiClient.delete<ApiResponse<null>>(`/batches/${batchId}`),
 };

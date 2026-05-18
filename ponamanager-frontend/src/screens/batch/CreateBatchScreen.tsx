@@ -12,6 +12,7 @@ import { Order } from '../../types';
 import { COLORS } from '../../constants';
 import { formatCurrency, formatDate, getPonaTypeColor, getTodayDate } from '../../utils/helpers';
 import dayjs from 'dayjs';
+import showAlert from '../../utils/alert';
 
 const OrderSelectCard = ({
   order,
@@ -100,9 +101,8 @@ export const CreateBatchScreen = () => {
     setSaving(true);
     try {
       const res = await batchAPI.create({ batchDate, orderIds: Array.from(selectedIds) });
-      Alert.alert('সফল', 'ব্যাচ তৈরি হয়েছে!', [
-        { text: 'OK', onPress: () => navigation.replace('BatchDetails', { batchId: res.data.data.id }) },
-      ]);
+     showAlert('সাফল্য', 'ব্যাচ সফলভাবে তৈরি হয়েছে');
+      navigation.navigate("Batches");
     } catch (err: any) {
       Alert.alert('ত্রুটি', err.response?.data?.message || 'ব্যাচ তৈরি ব্যর্থ হয়েছে');
     } finally {
