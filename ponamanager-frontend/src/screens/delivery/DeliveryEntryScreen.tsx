@@ -9,6 +9,7 @@ import { orderAPI, deliveryAPI } from '../../api/services';
 import { Order } from '../../types';
 import { COLORS } from '../../constants';
 import { formatCurrency } from '../../utils/helpers';
+import showAlert from '../../utils/alert';
 
 const CalcRow = ({ label, value, highlight }: any) => (
   <View style={[styles.calcRow, highlight && styles.calcRowHighlight]}>
@@ -60,7 +61,7 @@ export const DeliveryEntryScreen = () => {
 
   const handleSubmit = async () => {
     if (!deliveredQty || !deliveryRate) {
-      Alert.alert('Validation', 'Please enter delivered quantity and rate');
+    showAlert('Validation Error', 'Please fill in all required fields marked with *');
       return;
     }
     setSaving(true);

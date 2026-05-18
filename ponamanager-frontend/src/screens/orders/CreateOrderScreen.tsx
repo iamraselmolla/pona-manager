@@ -152,11 +152,12 @@ export const CreateOrderScreen = () => {
         deliveryDate,
         notes,
       };
-      await orderAPI.create(payload);
-      Alert.alert("Success", "Order created successfully", [
-        { text: "OK", onPress: () => navigation.goBack() },
-      ]);
-      navigation.navigate("OrdersList");
+      const result = await orderAPI.create(payload);
+      console.log("Order created:", result);
+      // Alert.alert("Success", "Order created successfully", [
+      //   { text: "OK", onPress: () => navigation.goBack() },
+      // ]);
+      navigation.navigate("Orders");
     } catch (err: any) {
       Alert.alert(
         "Error",
