@@ -755,6 +755,9 @@ export const BatchDetailsScreen = () => {
   const [selectedBO, setSelectedBO] = useState<BatchOrder | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+const [selectedOrder, setSelectedOrder] = useState<BatchOrder | null>(null);
+const [unbatchloading, setUnbatchLoading] = useState(false);
 
   const fetchBatch = useCallback(async () => {
     try {
@@ -772,27 +775,29 @@ export const BatchDetailsScreen = () => {
     fetchBatch();
   }, []);
 
-  const handleUnbatch = (bo: BatchOrder) => {
-    Alert.alert(
-      "আনব্যাচ করুন",
-      `"${bo.order.customerName}" এর অর্ডারটি ব্যাচ থেকে সরাতে চান?\n\nঅর্ডারটি pending হয়ে যাবে।`,
-      [
-        { text: "না", style: "cancel" },
-        {
-          text: "হ্যাঁ, সরাও",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await batchAPI.removeOrder(batchId, bo.id);
-              fetchBatch();
-            } catch {
-              Alert.alert("ত্রুটি", "আনব্যাচ ব্যর্থ হয়েছে");
-            }
-          },
-        },
-      ],
-    );
-  };
+ const handleUnbatch = (bo: BatchOrder) => {
+  setSelectedOrder(bo);
+  setConfirmVisible(true);
+};
+
+const confirmUnbatch = async () => {
+  if (!selectedOrder) return;
+
+  try {
+    setUnbatchLoading(true);
+
+    await batchAPI.removeOrder(batchId, selectedOrder.id);
+
+    setConfirmVisible(false);
+    setSelectedOrder(null);
+
+    fetchBatch();
+  } catch {
+    alert("আনব্যাচ ব্যর্থ হয়েছে");
+  } finally {
+    setUnbatchLoading(false);
+  }
+};
 
   const handleDeliverySubmit = async (data: any) => {
     if (!selectedBO) return;
@@ -1100,6 +1105,48 @@ export const BatchDetailsScreen = () => {
           )}
         </View>
       )}
+      <Modal
+  visible={confirmVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={() => !unbatchloading && setConfirmVisible(false)}
+>
+  <View style={styles.overlay} pointerEvents={unbatchloading ? "none" : "auto"}>
+    <View style={styles.modalCard}>
+      <Text style={styles.title}>আনব্যাচ করুন</Text>
+
+      <Text style={styles.message}>
+        "{selectedOrder?.order.customerName}" এর অর্ডারটি ব্যাচ থেকে সরাতে চান?
+      </Text>
+
+      <Text style={styles.subMessage}>
+        অর্ডারটি pending হয়ে যাবে।
+      </Text>
+
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={[styles.button, styles.cancelBtn]}
+          onPress={() => setConfirmVisible(false)}
+          disabled={unbatchloading}
+        >
+          <Text style={styles.cancelText}>না</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.deleteBtn]}
+          onPress={confirmUnbatch}
+          disabled={unbatchloading}
+        >
+          {unbatchloading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.deleteText}>হ্যাঁ, সরাও</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
 
       <DeliveryModal
         visible={modalVisible}
@@ -1117,6 +1164,74 @@ export const BatchDetailsScreen = () => {
 
 // ─── Styles (color-neutral) ────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+    overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  modalCard: {
+    width: "100%",
+    maxWidth: 380,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 22,
+    elevation: 10,
+  },
+
+  title: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 12,
+    color: "#111",
+  },
+
+  message: {
+    fontSize: 16,
+    color: "#333",
+    lineHeight: 24,
+  },
+
+  subMessage: {
+    marginTop: 10,
+    fontSize: 14,
+    color: "#777",
+  },
+
+  actions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 24,
+    gap: 12,
+  },
+
+  button: {
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    minWidth: 100,
+    alignItems: "center",
+  },
+
+  cancelBtn: {
+    backgroundColor: "#f1f1f1",
+  },
+
+  deleteBtn: {
+    backgroundColor: "#e53935",
+  },
+
+  cancelText: {
+    fontWeight: "600",
+    color: "#333",
+  },
+
+  deleteText: {
+    fontWeight: "700",
+    color: "#fff",
+  },
   container: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   headerCard: { padding: 16, borderBottomWidth: 1 },

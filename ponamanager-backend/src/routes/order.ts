@@ -73,6 +73,7 @@ router.get("/:id", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
+  console.log("Creating order with data:", req.body);
   try {
     const {
       customerId,

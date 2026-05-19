@@ -60,6 +60,7 @@ export const ORDER_STATUS = {
 };
 
 export const API_BASE_URL = "http://localhost:5000/api";
+// export const API_BASE_URL = "http://192.168.10.102/api";
 
 export const STORAGE_KEYS = {
   AUTH_TOKEN: "@ponamanager_auth_token",
