@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
   RefreshControl, ActivityIndicator, Animated, Alert,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -202,6 +203,9 @@ export const BatchListScreen = () => {
   const [refreshing,   setRefreshing]   = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [monthFilter,  setMonthFilter]  = useState(dayjs().format("YYYY-MM"));
+  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchBatches = useCallback(async () => {
     try {
@@ -221,32 +225,29 @@ export const BatchListScreen = () => {
   useEffect(() => { setLoading(true); fetchBatches(); }, [monthFilter, statusFilter]);
 
   // ── Delete batch ──────────────────────────────────────
-  const handleDelete = async (batch: Batch) => {
+  const handleDelete = (batch: Batch) => {
     if (batch.status === "completed") {
       Alert.alert("অনুমতি নেই", "সম্পন্ন ব্যাচ মুছে ফেলা যাবে না।");
       return;
     }
-    const orderCount = batch.batchOrders?.length ?? 0;
-    // Alert.alert(
-    //   "ব্যাচ মুছুন",
-    //   `"${batch.batchNumber}" মুছে ফেলতে চান?\n\n${orderCount > 0 ? `${orderCount} টি অর্ডার pending এ ফিরে যাবে এবং নতুন ব্যাচে যোগ করা যাবে।` : ""}`,
-    //   [
-    //     { text: "না", style: "cancel" },
-    //     {
-    //       text: "হ্যাঁ, মুছুন",
-    //       style: "destructive",
-    //       onPress: async () => {
-            try {
-              await batchAPI.deleteBatch(batch.id);
-              // Real-time remove from list
-              setBatches((prev) => prev.filter((b) => b.id !== batch.id));
-            } catch (err: any) {
-              Alert.alert("ত্রুটি", err?.response?.data?.message || "মুছে ফেলা যায়নি");
-            }
-    //       },
-    //     },
-    //   ]
-    // );
+    setSelectedBatch(batch);
+    setConfirmVisible(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedBatch) return;
+    setDeleting(true);
+
+    try {
+      await batchAPI.deleteBatch(selectedBatch.id);
+      setBatches((prev) => prev.filter((b) => b.id !== selectedBatch.id));
+      setConfirmVisible(false);
+      setSelectedBatch(null);
+    } catch (err: any) {
+      Alert.alert("ত্রুটি", err?.response?.data?.message || "মুছে ফেলা যায়নি");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -337,6 +338,50 @@ export const BatchListScreen = () => {
         />
       )}
 
+      {/* ── Confirm delete modal ── */}
+      <Modal
+        visible={confirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !deleting && setConfirmVisible(false)}
+      >
+        <View style={styles.overlay} pointerEvents={deleting ? "none" : "auto"}>
+          <View style={styles.modalCard}>
+            <Text style={styles.title}>ব্যাচ মুছুন</Text>
+            <Text style={styles.message}>
+              "{selectedBatch?.batchNumber}" ব্যাচটি মুছে ফেলতে চান?
+            </Text>
+            <Text style={styles.subMessage}>
+              {selectedBatch?.batchOrders?.length
+                ? `${selectedBatch.batchOrders.length} টি অর্ডার pending এ ফিরে যাবে।`
+                : "এই ব্যাচে কোনো অর্ডার নেই।"}
+            </Text>
+
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelBtn]}
+                onPress={() => setConfirmVisible(false)}
+                disabled={deleting}
+              >
+                <Text style={styles.cancelText}>না</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.deleteBtn]}
+                onPress={confirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.deleteText}>হ্যাঁ, সরাও</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── FAB ── */}
       <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate("CreateBatch")}>
         <Ionicons name="add" size={28} color={P.white} />
@@ -402,6 +447,17 @@ const styles = StyleSheet.create({
   emptyTitle:       { fontSize: 16, fontWeight: "700", color: P.textPrimary },
   emptySubtitle:    { fontSize: 13, color: P.textMuted, textAlign: "center", paddingHorizontal: 40 },
   listContent:      { padding: 14, paddingBottom: 90, flexGrow: 1 },
+  overlay:          { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 18 },
+  modalCard:        { width: "100%", maxWidth: 380, backgroundColor: P.white, borderRadius: 20, padding: 22, elevation: 10 },
+  title:            { fontSize: 20, fontWeight: "700", marginBottom: 12, color: "#111" },
+  message:          { fontSize: 16, color: "#333", lineHeight: 24 },
+  subMessage:       { marginTop: 10, fontSize: 14, color: "#666" },
+  actions:          { flexDirection: "row", justifyContent: "flex-end", marginTop: 24, gap: 12 },
+  button:           { paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12, minWidth: 100, alignItems: "center" },
+  cancelBtn:        { backgroundColor: "#f1f1f1" },
+  deleteBtn:        { backgroundColor: P.danger },
+  cancelText:       { fontWeight: "600", color: "#333" },
+  deleteText:       { fontWeight: "700", color: "#fff" },
 
   fab:              { position: "absolute", bottom: 22, right: 20, width: 56, height: 56, borderRadius: 18, backgroundColor: P.accent, alignItems: "center", justifyContent: "center", elevation: 8, shadowColor: P.accent, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 10 },
 });
