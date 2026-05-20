@@ -102,7 +102,6 @@ const getStatusConfig = (T: typeof LIGHT) => ({
   },
 });
 
-// ─── Delivery Mode Type ────────────────────────────────────────────────────────
 type DeliveryMode = "complete" | "partial";
 
 // ─── Delivery Modal ────────────────────────────────────────────────────────────
@@ -138,15 +137,13 @@ const DeliveryModal = ({
     }
   }, [batchOrder]);
 
-  // When mode switches, reset qty
-  useEffect(() => {
-    if (!batchOrder) return;
-    if (deliveryMode === "complete") {
+  // When mode switches, reset qty to full ordered amount
+  const handleModeSwitch = (mode: DeliveryMode) => {
+    setDeliveryMode(mode);
+    if (batchOrder) {
       setDeliveredQty(batchOrder.order.plQuantity.toString());
-    } else {
-      setDeliveredQty("");
     }
-  }, [deliveryMode]);
+  };
 
   if (!batchOrder) return null;
 
@@ -161,48 +158,53 @@ const DeliveryModal = ({
   const dueAmt = Math.max(0, finalAmt - totalPaid);
   const typeColor = getPonaTypeColor(batchOrder.order.ponaType) ?? T.accent;
 
-  // In partial mode, delivered must be < orderedQty and > 0
-  const partialValid =
-    deliveryMode === "partial" && delivered > 0 && delivered < orderedQty;
-  // In complete mode, delivered == orderedQty always
-  const completeValid = deliveryMode === "complete";
+  // complete mode: close order, no new order (even if delivered < ordered)
+  // partial mode: remaining becomes new pending order
+  const isLess = delivered > 0 && delivered < orderedQty;
 
   const handleSubmit = () => {
+    if (!deliveredQty || delivered <= 0) {
+      Alert.alert("সতর্কতা", "ডেলিভারি পরিমাণ দিন");
+      return;
+    }
     if (!deliveryRate || rate <= 0) {
       Alert.alert("সতর্কতা", "দর দিন");
       return;
     }
-    if (deliveryMode === "partial") {
-      if (!deliveredQty || delivered <= 0) {
-        Alert.alert("সতর্কতা", "ডেলিভারি পরিমাণ দিন");
-        return;
-      }
-      if (delivered >= orderedQty) {
-        Alert.alert(
-          "সতর্কতা",
-          `আংশিক ডেলিভারিতে ${orderedQty} PL এর কম দিতে হবে। পুরো দিতে চাইলে "সম্পূর্ণ ডেলিভারি" বেছে নিন।`,
-        );
-        return;
-      }
+    if (delivered > orderedQty) {
+      Alert.alert("সতর্কতা", `সর্বোচ্চ ${orderedQty.toLocaleString()} PL দেওয়া যাবে`);
+      return;
+    }
+    if (deliveryMode === "partial" && delivered >= orderedQty) {
+      Alert.alert(
+        "সতর্কতা",
+        "আংশিক ডেলিভারিতে অর্ডারের চেয়ে কম দিতে হবে।\nপুরো দিতে চাইলে \"সম্পূর্ণ ও বন্ধ\" বেছে নিন।",
+      );
+      return;
     }
 
-    const finalDelivered =
-      deliveryMode === "complete" ? orderedQty : delivered;
     const isPartial = deliveryMode === "partial";
-    const isClose = deliveryMode === "complete"; // close the order, no new partial
+    const isClose = deliveryMode === "complete";
+
+    let confirmMsg = "";
+    if (isClose && isLess) {
+      confirmMsg = `${delivered.toLocaleString()} PL ডেলিভারি হবে।\nবাকি ${remaining.toLocaleString()} PL বাদ দিয়ে অর্ডার বন্ধ হবে।\nকোনো নতুন অর্ডার তৈরি হবে না।\n\nনিশ্চিত করুন?`;
+    } else if (isClose) {
+      confirmMsg = `${delivered.toLocaleString()} PL ডেলিভারি করে অর্ডার বন্ধ করবেন?`;
+    } else {
+      confirmMsg = `${delivered.toLocaleString()} PL ডেলিভারি হবে।\nবাকি ${remaining.toLocaleString()} PL নতুন pending অর্ডার হিসেবে যোগ হবে।\n\nনিশ্চিত করুন?`;
+    }
 
     Alert.alert(
-      isPartial ? "আংশিক ডেলিভারি" : "সম্পূর্ণ ডেলিভারি নিশ্চিত",
-      isPartial
-        ? `${finalDelivered.toLocaleString()} PL ডেলিভারি হবে।\nবাকি ${remaining.toLocaleString()} PL নতুন অর্ডার হিসেবে যোগ হবে।\n\nনিশ্চিত করুন?`
-        : `${finalDelivered.toLocaleString()} PL ডেলিভারি করে অর্ডারটি বন্ধ করবেন?\n\n(নতুন কোনো অর্ডার তৈরি হবে না)`,
+      isPartial ? "আংশিক ডেলিভারি" : "সম্পূর্ণ ও বন্ধ",
+      confirmMsg,
       [
         { text: "না", style: "cancel" },
         {
           text: "হ্যাঁ",
           onPress: () =>
             onSubmit({
-              deliveredQuantity: finalDelivered,
+              deliveredQuantity: delivered,
               deliveryRate: rate,
               customerPayment: paid,
               dueAmount: dueAmt,
@@ -261,50 +263,18 @@ const DeliveryModal = ({
               ]}
             >
               {[
-                {
-                  label: "পোনার ধরন",
-                  value: null,
-                  pill: batchOrder.order.ponaType,
-                },
-                {
-                  label: "অর্ডার পরিমাণ",
-                  value: `${orderedQty.toLocaleString()} PL`,
-                  pill: null,
-                },
-                {
-                  label: "আগাম জমা",
-                  value: formatCurrency(advance),
-                  pill: null,
-                  valueColor: T.success,
-                },
+                { label: "পোনার ধরন", value: null, pill: batchOrder.order.ponaType },
+                { label: "অর্ডার পরিমাণ", value: `${orderedQty.toLocaleString()} PL`, pill: null },
+                { label: "আগাম জমা", value: formatCurrency(advance), pill: null, valueColor: T.success },
               ].map((row, i) => (
-                <View
-                  key={i}
-                  style={[mStyles.infoRow, { borderBottomColor: T.border }]}
-                >
-                  <Text style={[mStyles.infoLabel, { color: T.textSecondary }]}>
-                    {row.label}
-                  </Text>
+                <View key={i} style={[mStyles.infoRow, { borderBottomColor: T.border }]}>
+                  <Text style={[mStyles.infoLabel, { color: T.textSecondary }]}>{row.label}</Text>
                   {row.pill ? (
-                    <View
-                      style={[
-                        mStyles.typePill,
-                        { backgroundColor: typeColor + "20" },
-                      ]}
-                    >
-                      <Text
-                        style={[mStyles.typePillText, { color: typeColor }]}
-                      >
-                        {row.pill}
-                      </Text>
+                    <View style={[mStyles.typePill, { backgroundColor: typeColor + "20" }]}>
+                      <Text style={[mStyles.typePillText, { color: typeColor }]}>{row.pill}</Text>
                     </View>
                   ) : (
-                    <Text
-                      style={[
-                        mStyles.infoValue,
-                        { color: row.valueColor ?? T.textPrimary },
-                      ]}
-                    >
+                    <Text style={[mStyles.infoValue, { color: row.valueColor ?? T.textPrimary }]}>
                       {row.value}
                     </Text>
                   )}
@@ -312,70 +282,52 @@ const DeliveryModal = ({
               ))}
             </View>
 
-            {/* ── Delivery Mode Switcher ── */}
-            <View
-              style={[mStyles.modeSwitcherCard, { backgroundColor: T.surface }]}
-            >
-              <Text style={[mStyles.modeSwitcherTitle, { color: T.textPrimary }]}>
+            {/* ── Mode Switcher ── */}
+            <View style={[mStyles.modeSwitcherCard, { backgroundColor: T.surface }]}>
+              <Text style={[mStyles.modeSwitcherTitle, { color: T.textSecondary }]}>
                 ডেলিভারির ধরন
               </Text>
               <View style={[mStyles.modeRow, { backgroundColor: T.bg }]}>
-                {/* Complete mode */}
                 <TouchableOpacity
                   style={[
                     mStyles.modeBtn,
-                    deliveryMode === "complete" && {
-                      backgroundColor: T.success,
-                    },
+                    deliveryMode === "complete" && { backgroundColor: T.success },
                   ]}
-                  onPress={() => setDeliveryMode("complete")}
+                  onPress={() => handleModeSwitch("complete")}
                   activeOpacity={0.8}
                 >
                   <Ionicons
-                    name="checkmark-circle"
-                    size={16}
-                    color={
-                      deliveryMode === "complete" ? "#fff" : T.textSecondary
-                    }
+                    name="lock-closed"
+                    size={15}
+                    color={deliveryMode === "complete" ? "#fff" : T.textSecondary}
                   />
                   <Text
                     style={[
                       mStyles.modeBtnText,
-                      {
-                        color:
-                          deliveryMode === "complete" ? "#fff" : T.textSecondary,
-                      },
+                      { color: deliveryMode === "complete" ? "#fff" : T.textSecondary },
                     ]}
                   >
-                    সম্পূর্ণ ডেলিভারি
+                    সম্পূর্ণ ও বন্ধ
                   </Text>
                 </TouchableOpacity>
 
-                {/* Partial mode */}
                 <TouchableOpacity
                   style={[
                     mStyles.modeBtn,
-                    deliveryMode === "partial" && {
-                      backgroundColor: T.info,
-                    },
+                    deliveryMode === "partial" && { backgroundColor: T.info },
                   ]}
-                  onPress={() => setDeliveryMode("partial")}
+                  onPress={() => handleModeSwitch("partial")}
                   activeOpacity={0.8}
                 >
                   <Ionicons
                     name="git-branch-outline"
-                    size={16}
-                    color={
-                      deliveryMode === "partial" ? "#fff" : T.textSecondary
-                    }
+                    size={15}
+                    color={deliveryMode === "partial" ? "#fff" : T.textSecondary}
                   />
                   <Text
                     style={[
                       mStyles.modeBtnText,
-                      {
-                        color:
-                          deliveryMode === "partial" ? "#fff" : T.textSecondary,
-                      },
+                      { color: deliveryMode === "partial" ? "#fff" : T.textSecondary },
                     ]}
                   >
                     আংশিক ডেলিভারি
@@ -383,157 +335,121 @@ const DeliveryModal = ({
                 </TouchableOpacity>
               </View>
 
-              {/* Mode description */}
+              {/* Mode description banner */}
               {deliveryMode === "complete" ? (
-                <View
-                  style={[
-                    mStyles.modeInfoBanner,
-                    { backgroundColor: T.successSoft },
-                  ]}
-                >
-                  <Ionicons
-                    name="lock-closed-outline"
-                    size={14}
-                    color={T.success}
-                  />
-                  <Text
-                    style={[mStyles.modeInfoText, { color: T.success }]}
-                  >
-                    পুরো {orderedQty.toLocaleString()} PL ডেলিভারি হবে এবং অর্ডার বন্ধ হয়ে যাবে। কোনো নতুন অর্ডার তৈরি হবে না।
+                <View style={[mStyles.modeBanner, { backgroundColor: T.successSoft }]}>
+                  <Ionicons name="lock-closed-outline" size={13} color={T.success} />
+                  <Text style={[mStyles.modeBannerText, { color: T.success }]}>
+                    যত PL দিন — অর্ডার বন্ধ হবে। কম দিলেও নতুন অর্ডার তৈরি হবে না।
                   </Text>
                 </View>
               ) : (
-                <View
-                  style={[
-                    mStyles.modeInfoBanner,
-                    { backgroundColor: T.infoSoft },
-                  ]}
-                >
-                  <Ionicons
-                    name="information-circle"
-                    size={14}
-                    color={T.info}
-                  />
-                  <Text
-                    style={[mStyles.modeInfoText, { color: T.info }]}
-                  >
-                    কিছু PL ডেলিভারি করুন। বাকি PL স্বয়ংক্রিয়ভাবে নতুন pending অর্ডার হিসেবে যোগ হবে।
+                <View style={[mStyles.modeBanner, { backgroundColor: T.infoSoft }]}>
+                  <Ionicons name="git-branch-outline" size={13} color={T.info} />
+                  <Text style={[mStyles.modeBannerText, { color: T.info }]}>
+                    বাকি PL স্বয়ংক্রিয়ভাবে নতুন pending অর্ডার হিসেবে যোগ হবে।
                   </Text>
                 </View>
               )}
             </View>
 
-            {/* Partial remaining preview banner */}
-            {deliveryMode === "partial" && delivered > 0 && delivered < orderedQty && (
-              <View
-                style={[mStyles.partialBanner, { backgroundColor: T.infoSoft }]}
-              >
+            {/* ── Remaining preview (partial mode) ── */}
+            {deliveryMode === "partial" && isLess && (
+              <View style={[mStyles.remainingBanner, { backgroundColor: T.infoSoft }]}>
                 <Ionicons name="arrow-forward-circle" size={16} color={T.info} />
-                <Text style={[mStyles.partialBannerText, { color: T.info }]}>
-                  বাকি {remaining.toLocaleString()} PL নতুন pending অর্ডার হিসেবে যোগ হবে
+                <Text style={[mStyles.remainingBannerText, { color: T.info }]}>
+                  নতুন অর্ডার হবে: {remaining.toLocaleString()} PL
                 </Text>
               </View>
             )}
 
-            {/* Complete mode: qty locked, just show */}
-            {deliveryMode === "complete" && (
-              <View
-                style={[
-                  mStyles.lockedQtyCard,
-                  {
-                    backgroundColor: T.successSoft,
-                    borderColor: T.success,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="checkmark-done-circle"
-                  size={22}
-                  color={T.success}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[mStyles.lockedQtyLabel, { color: T.success }]}
-                  >
-                    ডেলিভারিকৃত পরিমাণ (নির্ধারিত)
-                  </Text>
-                  <Text style={[mStyles.lockedQtyValue, { color: T.success }]}>
-                    {orderedQty.toLocaleString()} PL
-                  </Text>
-                </View>
+            {/* ── Remaining skip preview (complete mode, less delivered) ── */}
+            {deliveryMode === "complete" && isLess && (
+              <View style={[mStyles.remainingBanner, { backgroundColor: T.warningSoft }]}>
+                <Ionicons name="close-circle-outline" size={16} color={T.warning} />
+                <Text style={[mStyles.remainingBannerText, { color: T.warning }]}>
+                  {remaining.toLocaleString()} PL বাদ দেওয়া হবে — নতুন অর্ডার নেই
+                </Text>
               </View>
             )}
 
             {/* Fields */}
             <View style={[mStyles.fieldsCard, { backgroundColor: T.surface }]}>
-              {/* Delivered qty — only editable in partial mode */}
-              {deliveryMode === "partial" && (
-                <View style={mStyles.field}>
-                  <Text
-                    style={[mStyles.fieldLabel, { color: T.textSecondary }]}
-                  >
-                    ডেলিভারিকৃত পরিমাণ{" "}
-                    <Text style={{ color: T.info }}>(আংশিক)</Text>
-                  </Text>
-                  <View
-                    style={[
-                      mStyles.inputRow,
-                      { borderColor: T.border, backgroundColor: T.inputBg },
-                    ]}
-                  >
-                    <TextInput
-                      style={[mStyles.input, { color: T.textPrimary }]}
-                      value={deliveredQty}
-                      onChangeText={setDeliveredQty}
-                      keyboardType="numeric"
-                      placeholder={`সর্বোচ্চ ${(orderedQty - 1).toLocaleString()}`}
-                      placeholderTextColor={T.textMuted}
-                    />
-                    <Text style={[mStyles.inputSuffix, { color: T.textMuted }]}>
-                      PL
-                    </Text>
-                  </View>
-                  {delivered > 0 && (
-                    <View style={mStyles.qtyProgress}>
+              {/* Delivered qty */}
+              <View style={mStyles.field}>
+                <Text style={[mStyles.fieldLabel, { color: T.textSecondary }]}>
+                  ডেলিভারিকৃত পরিমাণ
+                </Text>
+                <View
+                  style={[
+                    mStyles.inputRow,
+                    {
+                      borderColor:
+                        deliveryMode === "complete"
+                          ? delivered > 0 && delivered <= orderedQty
+                            ? T.success
+                            : T.border
+                          : delivered > 0 && delivered < orderedQty
+                          ? T.info
+                          : T.border,
+                      backgroundColor: T.inputBg,
+                    },
+                  ]}
+                >
+                  <TextInput
+                    style={[mStyles.input, { color: T.textPrimary }]}
+                    value={deliveredQty}
+                    onChangeText={setDeliveredQty}
+                    keyboardType="numeric"
+                    placeholder={`সর্বোচ্চ ${orderedQty.toLocaleString()}`}
+                    placeholderTextColor={T.textMuted}
+                  />
+                  <Text style={[mStyles.inputSuffix, { color: T.textMuted }]}>PL</Text>
+                </View>
+
+                {/* Progress bar */}
+                {delivered > 0 && (
+                  <View style={mStyles.qtyProgress}>
+                    <View style={[mStyles.qtyProgressBg, { backgroundColor: T.border }]}>
                       <View
                         style={[
-                          mStyles.qtyProgressBg,
-                          { backgroundColor: T.border },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            mStyles.qtyProgressFill,
-                            {
-                              width: `${Math.min((delivered / orderedQty) * 100, 100)}%`,
-                              backgroundColor:
-                                delivered >= orderedQty ? T.danger : T.info,
-                            },
-                          ]}
-                        />
-                      </View>
-                      <Text
-                        style={[
-                          mStyles.qtyProgressText,
+                          mStyles.qtyProgressFill,
                           {
-                            color:
-                              delivered >= orderedQty ? T.danger : T.textSecondary,
+                            width: `${Math.min((delivered / orderedQty) * 100, 100)}%`,
+                            backgroundColor:
+                              delivered > orderedQty
+                                ? T.danger
+                                : deliveryMode === "complete"
+                                ? T.success
+                                : T.info,
                           },
                         ]}
-                      >
-                        {((delivered / orderedQty) * 100).toFixed(0)}%
-                      </Text>
+                      />
                     </View>
-                  )}
-                  {delivered >= orderedQty && (
                     <Text
-                      style={[mStyles.fieldError, { color: T.danger }]}
+                      style={[
+                        mStyles.qtyProgressText,
+                        {
+                          color:
+                            delivered > orderedQty ? T.danger : T.textSecondary,
+                        },
+                      ]}
                     >
-                      আংশিক ডেলিভারিতে {orderedQty} PL এর কম দিতে হবে
+                      {((delivered / orderedQty) * 100).toFixed(0)}%
                     </Text>
-                  )}
-                </View>
-              )}
+                  </View>
+                )}
+                {delivered > orderedQty && (
+                  <Text style={[mStyles.fieldError, { color: T.danger }]}>
+                    অর্ডারের চেয়ে বেশি দেওয়া যাবে না
+                  </Text>
+                )}
+                {deliveryMode === "partial" && delivered >= orderedQty && delivered > 0 && (
+                  <Text style={[mStyles.fieldError, { color: T.danger }]}>
+                    আংশিকে অর্ডারের চেয়ে কম দিন
+                  </Text>
+                )}
+              </View>
 
               {/* Rate */}
               <View style={mStyles.field}>
@@ -541,10 +457,7 @@ const DeliveryModal = ({
                   ডেলিভারি দর (প্রতি PL)
                 </Text>
                 <View
-                  style={[
-                    mStyles.inputRow,
-                    { borderColor: T.border, backgroundColor: T.inputBg },
-                  ]}
+                  style={[mStyles.inputRow, { borderColor: T.border, backgroundColor: T.inputBg }]}
                 >
                   <TextInput
                     style={[mStyles.input, { color: T.textPrimary }]}
@@ -554,9 +467,7 @@ const DeliveryModal = ({
                     placeholder="0.00"
                     placeholderTextColor={T.textMuted}
                   />
-                  <Text style={[mStyles.inputSuffix, { color: T.textMuted }]}>
-                    ৳
-                  </Text>
+                  <Text style={[mStyles.inputSuffix, { color: T.textMuted }]}>৳</Text>
                 </View>
               </View>
 
@@ -566,10 +477,7 @@ const DeliveryModal = ({
                   আজকের পেমেন্ট
                 </Text>
                 <View
-                  style={[
-                    mStyles.inputRow,
-                    { borderColor: T.border, backgroundColor: T.inputBg },
-                  ]}
+                  style={[mStyles.inputRow, { borderColor: T.border, backgroundColor: T.inputBg }]}
                 >
                   <TextInput
                     style={[mStyles.input, { color: T.textPrimary }]}
@@ -579,9 +487,7 @@ const DeliveryModal = ({
                     placeholder="0"
                     placeholderTextColor={T.textMuted}
                   />
-                  <Text style={[mStyles.inputSuffix, { color: T.textMuted }]}>
-                    ৳
-                  </Text>
+                  <Text style={[mStyles.inputSuffix, { color: T.textMuted }]}>৳</Text>
                 </View>
               </View>
             </View>
@@ -593,10 +499,8 @@ const DeliveryModal = ({
               </Text>
               {[
                 {
-                  label: `মোট মূল্য (${(deliveryMode === "complete" ? orderedQty : delivered).toLocaleString()} × ${rate})`,
-                  val: formatCurrency(
-                    (deliveryMode === "complete" ? orderedQty : delivered) * rate,
-                  ),
+                  label: `মোট মূল্য (${delivered.toLocaleString()} × ${rate})`,
+                  val: formatCurrency(finalAmt),
                   color: T.textPrimary,
                 },
                 {
@@ -610,104 +514,71 @@ const DeliveryModal = ({
                   color: T.success,
                 },
               ].map((r, i) => (
-                <View
-                  key={i}
-                  style={[mStyles.calcRow, { borderBottomColor: T.border }]}
-                >
-                  <Text style={[mStyles.calcLabel, { color: T.textSecondary }]}>
-                    {r.label}
-                  </Text>
-                  <Text style={[mStyles.calcVal, { color: r.color }]}>
-                    {r.val}
-                  </Text>
+                <View key={i} style={[mStyles.calcRow, { borderBottomColor: T.border }]}>
+                  <Text style={[mStyles.calcLabel, { color: T.textSecondary }]}>{r.label}</Text>
+                  <Text style={[mStyles.calcVal, { color: r.color }]}>{r.val}</Text>
                 </View>
               ))}
               <View
                 style={[
                   mStyles.calcRow,
                   mStyles.calcRowTotal,
-                  {
-                    backgroundColor: dueAmt > 0 ? T.dangerSoft : T.successSoft,
-                  },
+                  { backgroundColor: dueAmt > 0 ? T.dangerSoft : T.successSoft },
                 ]}
               >
-                <Text
-                  style={[
-                    mStyles.calcLabel,
-                    { fontWeight: "800", color: T.textPrimary },
-                  ]}
-                >
+                <Text style={[mStyles.calcLabel, { fontWeight: "800", color: T.textPrimary }]}>
                   বাকি
                 </Text>
                 <Text
-                  style={{
-                    fontSize: 17,
-                    fontWeight: "900",
-                    color: dueAmt > 0 ? T.danger : T.success,
-                  }}
+                  style={{ fontSize: 17, fontWeight: "900", color: dueAmt > 0 ? T.danger : T.success }}
                 >
                   {formatCurrency(dueAmt)}
                 </Text>
               </View>
 
-              {/* Partial remaining qty row */}
-              {deliveryMode === "partial" &&
-                delivered > 0 &&
-                delivered < orderedQty && (
-                  <View
-                    style={[
-                      mStyles.calcRow,
-                      {
-                        backgroundColor: T.infoSoft,
-                        borderRadius: 8,
-                        paddingHorizontal: 10,
-                        marginTop: 6,
-                      },
-                    ]}
-                  >
-                    <Text style={[mStyles.calcLabel, { color: T.info }]}>
-                      নতুন অর্ডার (বাকি PL)
-                    </Text>
-                    <Text
-                      style={[
-                        mStyles.calcVal,
-                        { color: T.info, fontWeight: "800" },
-                      ]}
-                    >
-                      {remaining.toLocaleString()} PL
-                    </Text>
-                  </View>
-                )}
-
-              {/* Complete: closed label */}
-              {deliveryMode === "complete" && (
+              {/* What happens to remainder */}
+              {isLess && (
                 <View
                   style={[
                     mStyles.calcRow,
                     {
-                      backgroundColor: T.successSoft,
+                      backgroundColor:
+                        deliveryMode === "partial" ? T.infoSoft : T.warningSoft,
                       borderRadius: 8,
                       paddingHorizontal: 10,
                       marginTop: 6,
+                      borderBottomWidth: 0,
                     },
                   ]}
                 >
-                  <Text style={[mStyles.calcLabel, { color: T.success }]}>
-                    অর্ডার স্ট্যাটাস
+                  <Text
+                    style={[
+                      mStyles.calcLabel,
+                      { color: deliveryMode === "partial" ? T.info : T.warning },
+                    ]}
+                  >
+                    {deliveryMode === "partial" ? "নতুন অর্ডার (বাকি PL)" : "বাদ দেওয়া হবে (PL)"}
                   </Text>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                     <Ionicons
-                      name="lock-closed-outline"
+                      name={
+                        deliveryMode === "partial"
+                          ? "git-branch-outline"
+                          : "close-circle-outline"
+                      }
                       size={13}
-                      color={T.success}
+                      color={deliveryMode === "partial" ? T.info : T.warning}
                     />
                     <Text
                       style={[
                         mStyles.calcVal,
-                        { color: T.success, fontWeight: "800" },
+                        {
+                          color: deliveryMode === "partial" ? T.info : T.warning,
+                          fontWeight: "800",
+                        },
                       ]}
                     >
-                      বন্ধ হবে
+                      {remaining.toLocaleString()} PL
                     </Text>
                   </View>
                 </View>
@@ -716,25 +587,13 @@ const DeliveryModal = ({
 
             {/* Due date */}
             {dueAmt > 0 && (
-              <View
-                style={[
-                  mStyles.dueDateCard,
-                  { backgroundColor: T.dangerSoft },
-                ]}
-              >
-                <Ionicons
-                  name="calendar-outline"
-                  size={16}
-                  color={T.danger}
-                />
+              <View style={[mStyles.dueDateCard, { backgroundColor: T.dangerSoft }]}>
+                <Ionicons name="calendar-outline" size={16} color={T.danger} />
                 <Text style={[mStyles.dueDateLabel, { color: T.danger }]}>
                   বাকি পরিশোধের তারিখ
                 </Text>
                 <TextInput
-                  style={[
-                    mStyles.dueDateInput,
-                    { color: T.danger, borderColor: T.danger },
-                  ]}
+                  style={[mStyles.dueDateInput, { color: T.danger, borderColor: T.danger }]}
                   value={dueDate}
                   onChangeText={setDueDate}
                   placeholder="YYYY-MM-DD"
@@ -746,10 +605,7 @@ const DeliveryModal = ({
             {/* Notes */}
             <View style={[mStyles.notesCard, { backgroundColor: T.surface }]}>
               <TextInput
-                style={[
-                  mStyles.notesInput,
-                  { borderColor: T.border, color: T.textPrimary },
-                ]}
+                style={[mStyles.notesInput, { borderColor: T.border, color: T.textPrimary }]}
                 value={notes}
                 onChangeText={setNotes}
                 placeholder="নোট (ঐচ্ছিক)..."
@@ -763,19 +619,11 @@ const DeliveryModal = ({
           </ScrollView>
 
           {/* Submit */}
-          <View
-            style={[
-              mStyles.footer,
-              { backgroundColor: T.surface, borderTopColor: T.border },
-            ]}
-          >
+          <View style={[mStyles.footer, { backgroundColor: T.surface, borderTopColor: T.border }]}>
             <TouchableOpacity
               style={[
                 mStyles.submitBtn,
-                {
-                  backgroundColor:
-                    deliveryMode === "complete" ? T.success : T.info,
-                },
+                { backgroundColor: deliveryMode === "complete" ? T.success : T.info },
               ]}
               onPress={handleSubmit}
               disabled={saving}
@@ -785,18 +633,14 @@ const DeliveryModal = ({
               ) : (
                 <>
                   <Ionicons
-                    name={
-                      deliveryMode === "complete"
-                        ? "lock-closed"
-                        : "git-branch-outline"
-                    }
+                    name={deliveryMode === "complete" ? "lock-closed" : "git-branch-outline"}
                     size={20}
                     color="#fff"
                   />
                   <Text style={mStyles.submitBtnText}>
                     {deliveryMode === "complete"
-                      ? "সম্পূর্ণ ডেলিভারি ও অর্ডার বন্ধ"
-                      : "আংশিক ডেলিভারি নিশ্চিত"}
+                      ? "ডেলিভারি দিয়ে অর্ডার বন্ধ করুন"
+                      : "আংশিক ডেলিভারি নিশ্চিত করুন"}
                   </Text>
                 </>
               )}
@@ -821,16 +665,15 @@ const BatchOrderRow = ({
   const T = useTheme();
   const STATUS = getStatusConfig(T);
   const typeColor = getPonaTypeColor(batchOrder.order.ponaType) ?? T.accent;
-  const st =
-    STATUS[batchOrder.deliveryStatus as keyof typeof STATUS] ?? STATUS.pending;
+  const st = STATUS[batchOrder.deliveryStatus as keyof typeof STATUS] ?? STATUS.pending;
 
   return (
     <View
       style={[
         rowStyles.card,
         { backgroundColor: T.surface },
-        batchOrder.deliveryStatus === "delivered" && rowStyles.cardDone,
-        batchOrder.deliveryStatus === "closed" && rowStyles.cardClosed,
+        (batchOrder.deliveryStatus === "delivered" || batchOrder.deliveryStatus === "closed") &&
+          rowStyles.cardDone,
       ]}
     >
       <View style={[rowStyles.typeBar, { backgroundColor: typeColor }]} />
@@ -842,9 +685,7 @@ const BatchOrderRow = ({
           </Text>
           <View style={[rowStyles.statusPill, { backgroundColor: st.bg }]}>
             <Ionicons name={st.icon} size={11} color={st.color} />
-            <Text style={[rowStyles.statusText, { color: st.color }]}>
-              {st.label}
-            </Text>
+            <Text style={[rowStyles.statusText, { color: st.color }]}>{st.label}</Text>
           </View>
         </View>
 
@@ -854,9 +695,7 @@ const BatchOrderRow = ({
 
         {/* Type + Qty */}
         <View style={rowStyles.metaRow}>
-          <View
-            style={[rowStyles.typePill, { backgroundColor: typeColor + "20" }]}
-          >
+          <View style={[rowStyles.typePill, { backgroundColor: typeColor + "20" }]}>
             <Text style={[rowStyles.typeText, { color: typeColor }]}>
               {batchOrder.order.ponaType}
             </Text>
@@ -867,27 +706,14 @@ const BatchOrderRow = ({
               : `${batchOrder.order.plQuantity.toLocaleString()} PL`}
           </Text>
           {batchOrder.deliveryStatus === "partial" && (
-            <View
-              style={[rowStyles.partialBadge, { backgroundColor: T.infoSoft }]}
-            >
-              <Text style={[rowStyles.partialBadgeText, { color: T.info }]}>
-                আংশিক
-              </Text>
+            <View style={[rowStyles.badge, { backgroundColor: T.infoSoft }]}>
+              <Text style={[rowStyles.badgeText, { color: T.info }]}>আংশিক</Text>
             </View>
           )}
           {batchOrder.deliveryStatus === "closed" && (
-            <View
-              style={[
-                rowStyles.partialBadge,
-                { backgroundColor: T.border },
-              ]}
-            >
+            <View style={[rowStyles.badge, { backgroundColor: T.border }]}>
               <Ionicons name="lock-closed-outline" size={9} color={T.textMuted} />
-              <Text
-                style={[rowStyles.partialBadgeText, { color: T.textMuted }]}
-              >
-                বন্ধ
-              </Text>
+              <Text style={[rowStyles.badgeText, { color: T.textMuted }]}> বন্ধ</Text>
             </View>
           )}
         </View>
@@ -895,29 +721,21 @@ const BatchOrderRow = ({
         {/* Financial info after delivery */}
         {batchOrder.deliveryStatus !== "pending" && (
           <View style={rowStyles.deliveredInfo}>
-            <Text
-              style={[rowStyles.deliveredInfoItem, { color: T.textSecondary }]}
-            >
+            <Text style={[rowStyles.deliveredInfoItem, { color: T.textSecondary }]}>
               পেয়েছি:{" "}
               <Text style={{ color: T.success, fontWeight: "700" }}>
                 {formatCurrency(batchOrder.customerPayment || 0)}
               </Text>
             </Text>
             {(batchOrder.dueAmount || 0) > 0 && (
-              <Text
-                style={[
-                  rowStyles.deliveredInfoItem,
-                  { color: T.textSecondary },
-                ]}
-              >
+              <Text style={[rowStyles.deliveredInfoItem, { color: T.textSecondary }]}>
                 বাকি:{" "}
                 <Text style={{ color: T.danger, fontWeight: "700" }}>
                   {formatCurrency(batchOrder.dueAmount || 0)}
                 </Text>
                 {batchOrder.duePaymentDate ? (
                   <Text style={{ color: T.textMuted }}>
-                    {" "}
-                    ({formatDate(batchOrder.duePaymentDate)} এর মধ্যে)
+                    {" "}({formatDate(batchOrder.duePaymentDate)} এর মধ্যে)
                   </Text>
                 ) : null}
               </Text>
@@ -925,7 +743,7 @@ const BatchOrderRow = ({
           </View>
         )}
 
-        {/* Action buttons — only for pending */}
+        {/* Action buttons */}
         {batchOrder.deliveryStatus === "pending" && (
           <View style={rowStyles.actionRow}>
             <TouchableOpacity
@@ -939,14 +757,8 @@ const BatchOrderRow = ({
               style={[rowStyles.unbatchBtn, { borderColor: T.danger }]}
               onPress={onUnbatch}
             >
-              <Ionicons
-                name="remove-circle-outline"
-                size={13}
-                color={T.danger}
-              />
-              <Text style={[rowStyles.unbatchBtnText, { color: T.danger }]}>
-                আনব্যাচ
-              </Text>
+              <Ionicons name="remove-circle-outline" size={13} color={T.danger} />
+              <Text style={[rowStyles.unbatchBtnText, { color: T.danger }]}>আনব্যাচ</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1019,27 +831,22 @@ export const BatchDetailsScreen = () => {
       Alert.alert(
         "সফল!",
         data.isClose
-          ? `ডেলিভারি সম্পন্ন। অর্ডারটি বন্ধ করা হয়েছে।`
-          : data.isPartial
-            ? `আংশিক ডেলিভারি সম্পন্ন। বাকি ${data.remainingQuantity.toLocaleString()} PL নতুন অর্ডার হিসেবে যোগ হয়েছে।`
-            : "ডেলিভারি সম্পন্ন হয়েছে!",
+          ? data.remainingQuantity > 0
+            ? `ডেলিভারি সম্পন্ন। অর্ডার বন্ধ করা হয়েছে।`
+            : "ডেলিভারি সম্পন্ন। অর্ডার বন্ধ করা হয়েছে।"
+          : `আংশিক ডেলিভারি সম্পন্ন। বাকি ${data.remainingQuantity.toLocaleString()} PL নতুন অর্ডার হিসেবে যোগ হয়েছে।`,
       );
     } catch (err: any) {
-      Alert.alert(
-        "ত্রুটি",
-        err.response?.data?.message || "ডেলিভারি রেকর্ড ব্যর্থ",
-      );
+      Alert.alert("ত্রুটি", err.response?.data?.message || "ডেলিভারি রেকর্ড ব্যর্থ");
     } finally {
       setSaving(false);
     }
   };
 
   const pendingCount =
-    batch?.batchOrders?.filter((o) => o.deliveryStatus === "pending").length ||
-    0;
+    batch?.batchOrders?.filter((o) => o.deliveryStatus === "pending").length || 0;
   const deliveredCount =
-    batch?.batchOrders?.filter((o) => o.deliveryStatus !== "pending").length ||
-    0;
+    batch?.batchOrders?.filter((o) => o.deliveryStatus !== "pending").length || 0;
   const totalOrders = batch?.batchOrders?.length || 0;
   const canComplete =
     batch?.status !== "completed" && pendingCount === 0 && totalOrders > 0;
@@ -1064,10 +871,7 @@ export const BatchDetailsScreen = () => {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              fetchBatch();
-            }}
+            onRefresh={() => { setRefreshing(true); fetchBatch(); }}
             colors={[T.accent]}
             tintColor={T.accent}
           />
@@ -1075,136 +879,78 @@ export const BatchDetailsScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Header card ── */}
-        <View
-          style={[
-            styles.headerCard,
-            { backgroundColor: T.surface, borderBottomColor: T.border },
-          ]}
-        >
+        <View style={[styles.headerCard, { backgroundColor: T.surface, borderBottomColor: T.border }]}>
           <View style={styles.headerTop}>
             <View>
-              <Text style={[styles.batchNum, { color: T.textPrimary }]}>
-                {batch.batchNumber}
-              </Text>
+              <Text style={[styles.batchNum, { color: T.textPrimary }]}>{batch.batchNumber}</Text>
               <Text style={[styles.batchDate, { color: T.textSecondary }]}>
                 {formatDate(batch.batchDate)}
               </Text>
             </View>
             <View
-              style={[
-                styles.progressCircle,
-                { backgroundColor: T.accentSoft, borderColor: T.accent },
-              ]}
+              style={[styles.progressCircle, { backgroundColor: T.accentSoft, borderColor: T.accent }]}
             >
               <Text style={[styles.progressNum, { color: T.accent }]}>
                 {deliveredCount}/{totalOrders}
               </Text>
-              <Text style={[styles.progressLabel, { color: T.accent }]}>
-                সম্পন্ন
-              </Text>
+              <Text style={[styles.progressLabel, { color: T.accent }]}>সম্পন্ন</Text>
             </View>
           </View>
 
-          {/* Progress bar */}
           <View style={[styles.progressBg, { backgroundColor: T.border }]}>
             <View
               style={[
                 styles.progressFill,
                 {
-                  width:
-                    totalOrders > 0
-                      ? `${(deliveredCount / totalOrders) * 100}%`
-                      : "0%",
+                  width: totalOrders > 0 ? `${(deliveredCount / totalOrders) * 100}%` : "0%",
                   backgroundColor: T.accent,
                 },
               ]}
             />
           </View>
           <Text style={[styles.progressText, { color: T.textSecondary }]}>
-            {pendingCount > 0
-              ? `${pendingCount} টি বাকি আছে`
-              : "সব ডেলিভারি সম্পন্ন ✓"}
+            {pendingCount > 0 ? `${pendingCount} টি বাকি আছে` : "সব ডেলিভারি সম্পন্ন ✓"}
           </Text>
 
-          {/* Pona chips */}
           <View style={styles.ponaRow}>
             {PONA_CHIPS.map(({ key, label, color }) => {
               const ordered = (batch as any)[`totalOrdered${key}`] ?? 0;
               const delivered = (batch as any)[`totalDelivered${key}`] ?? 0;
               if (ordered === 0) return null;
               return (
-                <View
-                  key={key}
-                  style={[
-                    styles.ponaChip,
-                    { backgroundColor: color + "18", borderColor: color },
-                  ]}
-                >
+                <View key={key} style={[styles.ponaChip, { backgroundColor: color + "18", borderColor: color }]}>
                   <Text style={[styles.ponaChipTitle, { color }]}>{label}</Text>
-                  <Text style={[styles.ponaChipSub, { color }]}>
-                    {delivered}/{ordered}
-                  </Text>
+                  <Text style={[styles.ponaChipSub, { color }]}>{delivered}/{ordered}</Text>
                 </View>
               );
             })}
           </View>
 
-          {/* Financial row */}
           <View style={styles.finRow}>
             <View style={[styles.finItem, { backgroundColor: T.successSoft }]}>
-              <Text style={[styles.finLabel, { color: T.textSecondary }]}>
-                প্রাপ্ত
-              </Text>
-              <Text style={[styles.finVal, { color: T.success }]}>
-                {formatCurrency(batch.totalCollected)}
-              </Text>
+              <Text style={[styles.finLabel, { color: T.textSecondary }]}>প্রাপ্ত</Text>
+              <Text style={[styles.finVal, { color: T.success }]}>{formatCurrency(batch.totalCollected)}</Text>
             </View>
             {(batch.totalDue ?? 0) > 0 && (
-              <View
-                style={[
-                  styles.finItem,
-                  styles.dueItem,
-                  { backgroundColor: T.dangerSoft },
-                ]}
-              >
-                <Text style={[styles.finLabel, { color: T.textSecondary }]}>
-                  বাকি
-                </Text>
-                <Text style={[styles.finVal, { color: T.danger }]}>
-                  {formatCurrency(batch.totalDue)}
-                </Text>
+              <View style={[styles.finItem, styles.dueItem, { backgroundColor: T.dangerSoft }]}>
+                <Text style={[styles.finLabel, { color: T.textSecondary }]}>বাকি</Text>
+                <Text style={[styles.finVal, { color: T.danger }]}>{formatCurrency(batch.totalDue)}</Text>
                 {(batch.duePendingCount ?? 0) > 0 && (
-                  <View
-                    style={[
-                      styles.duePeopleBadge,
-                      { backgroundColor: T.danger },
-                    ]}
-                  >
-                    <Text style={styles.duePeopleText}>
-                      {batch.duePendingCount} জন
-                    </Text>
+                  <View style={[styles.duePeopleBadge, { backgroundColor: T.danger }]}>
+                    <Text style={styles.duePeopleText}>{batch.duePendingCount} জন</Text>
                   </View>
                 )}
               </View>
             )}
             <View style={[styles.finItem, { backgroundColor: T.accentSoft }]}>
-              <Text style={[styles.finLabel, { color: T.textSecondary }]}>
-                অর্ডার
-              </Text>
-              <Text style={[styles.finVal, { color: T.accent }]}>
-                {totalOrders} টি
-              </Text>
+              <Text style={[styles.finLabel, { color: T.textSecondary }]}>অর্ডার</Text>
+              <Text style={[styles.finVal, { color: T.accent }]}>{totalOrders} টি</Text>
             </View>
           </View>
         </View>
 
         {/* ── Legend ── */}
-        <View
-          style={[
-            styles.legendRow,
-            { backgroundColor: T.surface, borderTopColor: T.border },
-          ]}
-        >
+        <View style={[styles.legendRow, { backgroundColor: T.surface, borderTopColor: T.border }]}>
           {[
             { color: "#F5A623", label: "পেন্ডিং" },
             { color: "#1E88E5", label: "আংশিক" },
@@ -1212,16 +958,12 @@ export const BatchDetailsScreen = () => {
           ].map((l) => (
             <View key={l.label} style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: l.color }]} />
-              <Text style={[styles.legendText, { color: T.textSecondary }]}>
-                {l.label}
-              </Text>
+              <Text style={[styles.legendText, { color: T.textSecondary }]}>{l.label}</Text>
             </View>
           ))}
           <View style={styles.legendSep} />
           <Ionicons name="remove-circle-outline" size={14} color={T.danger} />
-          <Text style={[styles.legendText, { color: T.textSecondary }]}>
-            আনব্যাচ
-          </Text>
+          <Text style={[styles.legendText, { color: T.textSecondary }]}>আনব্যাচ</Text>
         </View>
 
         {/* ── Order list ── */}
@@ -1234,10 +976,7 @@ export const BatchDetailsScreen = () => {
               <BatchOrderRow
                 key={bo.id}
                 batchOrder={bo}
-                onDeliver={() => {
-                  setSelectedBO(bo);
-                  setModalVisible(true);
-                }}
+                onDeliver={() => { setSelectedBO(bo); setModalVisible(true); }}
                 onUnbatch={() => handleUnbatch(bo)}
               />
             ))}
@@ -1247,31 +986,16 @@ export const BatchDetailsScreen = () => {
         {/* ── Expenses ── */}
         {batch.expenses && batch.expenses.length > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>
-              খরচের বিবরণ
-            </Text>
+            <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>খরচের বিবরণ</Text>
             <View style={[styles.expenseCard, { backgroundColor: T.surface }]}>
               {batch.expenses.map((e: any, i: number) => (
-                <View
-                  key={i}
-                  style={[styles.expenseRow, { borderBottomColor: T.border }]}
-                >
-                  <Text
-                    style={[styles.expenseLabel, { color: T.textSecondary }]}
-                  >
-                    {e.label}
-                  </Text>
-                  <Text style={[styles.expenseAmt, { color: T.textPrimary }]}>
-                    {formatCurrency(e.amount)}
-                  </Text>
+                <View key={i} style={[styles.expenseRow, { borderBottomColor: T.border }]}>
+                  <Text style={[styles.expenseLabel, { color: T.textSecondary }]}>{e.label}</Text>
+                  <Text style={[styles.expenseAmt, { color: T.textPrimary }]}>{formatCurrency(e.amount)}</Text>
                 </View>
               ))}
               <View style={[styles.expenseRow, styles.expenseTotal]}>
-                <Text
-                  style={[styles.expenseTotalLabel, { color: T.textPrimary }]}
-                >
-                  মোট খরচ
-                </Text>
+                <Text style={[styles.expenseTotalLabel, { color: T.textPrimary }]}>মোট খরচ</Text>
                 <Text style={[styles.expenseTotalAmt, { color: T.warning }]}>
                   {formatCurrency(batch.totalExpenses)}
                 </Text>
@@ -1285,33 +1009,21 @@ export const BatchDetailsScreen = () => {
 
       {/* ── Bottom bar ── */}
       {batch.status !== "completed" && (
-        <View
-          style={[
-            styles.bottomBar,
-            { backgroundColor: T.surface, borderTopColor: T.border },
-          ]}
-        >
+        <View style={[styles.bottomBar, { backgroundColor: T.surface, borderTopColor: T.border }]}>
           {!canComplete ? (
-            <View
-              style={[styles.pendingWarn, { backgroundColor: T.warningSoft }]}
-            >
+            <View style={[styles.pendingWarn, { backgroundColor: T.warningSoft }]}>
               <Ionicons name="warning-outline" size={18} color={T.warning} />
               <Text style={[styles.pendingWarnText, { color: T.warning }]}>
-                {pendingCount} টি ডেলিভারি বাকি। সব ডেলিভারি করলে ব্যাচ কমপ্লিট
-                করা যাবে।
+                {pendingCount} টি ডেলিভারি বাকি। সব ডেলিভারি করলে ব্যাচ কমপ্লিট করা যাবে।
               </Text>
             </View>
           ) : (
             <TouchableOpacity
               style={[styles.completeBtn, { backgroundColor: T.success }]}
-              onPress={() =>
-                navigation.navigate("CompleteBatch", { batchId: batch.id })
-              }
+              onPress={() => navigation.navigate("CompleteBatch", { batchId: batch.id })}
             >
               <Ionicons name="checkmark-done-circle" size={20} color="#fff" />
-              <Text style={styles.completeBtnText}>
-                খরচ দিয়ে ব্যাচ কমপ্লিট করুন
-              </Text>
+              <Text style={styles.completeBtnText}>খরচ দিয়ে ব্যাচ কমপ্লিট করুন</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -1324,27 +1036,23 @@ export const BatchDetailsScreen = () => {
         animationType="fade"
         onRequestClose={() => !unbatchloading && setConfirmVisible(false)}
       >
-        <View
-          style={styles.overlay}
-          pointerEvents={unbatchloading ? "none" : "auto"}
-        >
+        <View style={styles.overlay} pointerEvents={unbatchloading ? "none" : "auto"}>
           <View style={styles.modalCard}>
-            <Text style={styles.title}>আনব্যাচ করুন</Text>
-            <Text style={styles.message}>
-              "{selectedOrder?.order.customerName}" এর অর্ডারটি ব্যাচ থেকে
-              সরাতে চান?
+            <Text style={styles.modalTitle}>আনব্যাচ করুন</Text>
+            <Text style={styles.modalMessage}>
+              "{selectedOrder?.order.customerName}" এর অর্ডারটি ব্যাচ থেকে সরাতে চান?
             </Text>
-            <Text style={styles.subMessage}>অর্ডারটি pending হয়ে যাবে।</Text>
-            <View style={styles.actions}>
+            <Text style={styles.modalSub}>অর্ডারটি pending হয়ে যাবে।</Text>
+            <View style={styles.modalActions}>
               <TouchableOpacity
-                style={[styles.button, styles.cancelBtn]}
+                style={[styles.modalBtn, styles.cancelBtn]}
                 onPress={() => setConfirmVisible(false)}
                 disabled={unbatchloading}
               >
                 <Text style={styles.cancelText}>না</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.button, styles.deleteBtn]}
+                style={[styles.modalBtn, styles.deleteBtn]}
                 onPress={confirmUnbatch}
                 disabled={unbatchloading}
               >
@@ -1362,10 +1070,7 @@ export const BatchDetailsScreen = () => {
       <DeliveryModal
         visible={modalVisible}
         batchOrder={selectedBO}
-        onClose={() => {
-          setModalVisible(false);
-          setSelectedBO(null);
-        }}
+        onClose={() => { setModalVisible(false); setSelectedBO(null); }}
         onSubmit={handleDeliverySubmit}
         saving={saving}
       />
@@ -1390,22 +1095,11 @@ const styles = StyleSheet.create({
     padding: 22,
     elevation: 10,
   },
-  title: { fontSize: 20, fontWeight: "700", marginBottom: 12, color: "#111" },
-  message: { fontSize: 16, color: "#333", lineHeight: 24 },
-  subMessage: { marginTop: 10, fontSize: 14, color: "#777" },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginTop: 24,
-    gap: 12,
-  },
-  button: {
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 12,
-    minWidth: 100,
-    alignItems: "center",
-  },
+  modalTitle: { fontSize: 20, fontWeight: "700", marginBottom: 12, color: "#111" },
+  modalMessage: { fontSize: 16, color: "#333", lineHeight: 24 },
+  modalSub: { marginTop: 10, fontSize: 14, color: "#777" },
+  modalActions: { flexDirection: "row", justifyContent: "flex-end", marginTop: 24, gap: 12 },
+  modalBtn: { paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12, minWidth: 100, alignItems: "center" },
   cancelBtn: { backgroundColor: "#f1f1f1" },
   deleteBtn: { backgroundColor: "#e53935" },
   cancelText: { fontWeight: "600", color: "#333" },
@@ -1413,34 +1107,17 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   headerCard: { padding: 16, borderBottomWidth: 1 },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
+  headerTop: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
   batchNum: { fontSize: 20, fontWeight: "900" },
   batchDate: { fontSize: 13, marginTop: 2 },
-  progressCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-  },
+  progressCircle: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   progressNum: { fontSize: 14, fontWeight: "800" },
   progressLabel: { fontSize: 9 },
   progressBg: { height: 8, borderRadius: 4, marginBottom: 6 },
   progressFill: { height: 8, borderRadius: 4 },
   progressText: { fontSize: 11, marginBottom: 12 },
   ponaRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
-  ponaChip: {
-    flex: 1,
-    borderRadius: 10,
-    padding: 8,
-    borderWidth: 1.5,
-    alignItems: "center",
-  },
+  ponaChip: { flex: 1, borderRadius: 10, padding: 8, borderWidth: 1.5, alignItems: "center" },
   ponaChipTitle: { fontSize: 11, fontWeight: "800" },
   ponaChipSub: { fontSize: 11, fontWeight: "600" },
   finRow: { flexDirection: "row", gap: 8 },
@@ -1448,21 +1125,9 @@ const styles = StyleSheet.create({
   dueItem: {},
   finLabel: { fontSize: 11 },
   finVal: { fontSize: 14, fontWeight: "800", marginTop: 2 },
-  duePeopleBadge: {
-    borderRadius: 8,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    marginTop: 2,
-  },
+  duePeopleBadge: { borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1, marginTop: 2 },
   duePeopleText: { color: "#fff", fontSize: 9, fontWeight: "700" },
-  legendRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-  },
+  legendRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontSize: 11 },
@@ -1471,322 +1136,87 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 14, fontWeight: "800", marginBottom: 8 },
   orderList: { gap: 8 },
   expenseCard: { borderRadius: 10, padding: 12 },
-  expenseRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-  },
+  expenseRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderBottomWidth: 1 },
   expenseLabel: { fontSize: 13 },
   expenseAmt: { fontSize: 13, fontWeight: "700" },
   expenseTotal: { borderBottomWidth: 0, marginTop: 4 },
   expenseTotalLabel: { fontSize: 14, fontWeight: "800" },
   expenseTotalAmt: { fontSize: 16, fontWeight: "900" },
-  bottomBar: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 14,
-    borderTopWidth: 1,
-    elevation: 10,
-  },
-  pendingWarn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderRadius: 10,
-    padding: 12,
-  },
+  bottomBar: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 14, borderTopWidth: 1, elevation: 10 },
+  pendingWarn: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, padding: 12 },
   pendingWarnText: { flex: 1, fontSize: 12, fontWeight: "600" },
-  completeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderRadius: 12,
-    paddingVertical: 14,
-  },
+  completeBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 12, paddingVertical: 14 },
   completeBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
 });
 
 const rowStyles = StyleSheet.create({
-  card: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    borderRadius: 12,
-    overflow: "hidden",
-    elevation: 1,
-  },
+  card: { flexDirection: "row", alignItems: "flex-start", borderRadius: 12, overflow: "hidden", elevation: 1 },
   cardDone: { opacity: 0.85 },
-  cardClosed: { opacity: 0.7 },
   typeBar: { width: 5, alignSelf: "stretch" },
-  top: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: 10,
-    paddingRight: 10,
-  },
+  top: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 10, paddingRight: 10 },
   customerName: { fontSize: 14, fontWeight: "700", flex: 1 },
-  statusPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
+  statusPill: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 10 },
   statusText: { fontSize: 10, fontWeight: "700" },
   mobile: { fontSize: 12, paddingRight: 10, marginTop: 1 },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 4,
-    paddingRight: 10,
-  },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4, paddingRight: 10 },
   typePill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   typeText: { fontSize: 10, fontWeight: "700" },
   qty: { fontSize: 12, fontWeight: "600" },
-  partialBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  partialBadgeText: { fontSize: 9, fontWeight: "700" },
+  badge: { flexDirection: "row", alignItems: "center", borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
+  badgeText: { fontSize: 9, fontWeight: "700" },
   deliveredInfo: { paddingBottom: 10, paddingRight: 10, marginTop: 4, gap: 2 },
   deliveredInfoItem: { fontSize: 12 },
   actionRow: { flexDirection: "row", gap: 8, padding: 10, paddingTop: 6 },
-  deliverBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    borderRadius: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
+  deliverBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 6 },
   deliverBtnText: { color: "#fff", fontSize: 11, fontWeight: "700" },
-  unbatchBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    borderWidth: 1.5,
-    borderRadius: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
+  unbatchBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1.5, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 6 },
   unbatchBtnText: { fontSize: 11, fontWeight: "700" },
 });
 
 const mStyles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-  },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 16, borderBottomWidth: 1 },
   headerTitle: { fontSize: 17, fontWeight: "800" },
   headerSub: { fontSize: 13, marginTop: 2 },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  infoCard: {
-    marginHorizontal: 14,
-    marginTop: 14,
-    borderRadius: 12,
-    padding: 14,
-    borderTopWidth: 3,
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-  },
+  closeBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  infoCard: { marginHorizontal: 14, marginTop: 14, borderRadius: 12, padding: 14, borderTopWidth: 3 },
+  infoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6, borderBottomWidth: 1 },
   infoLabel: { fontSize: 13 },
   infoValue: { fontSize: 13, fontWeight: "700" },
   typePill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   typePillText: { fontSize: 11, fontWeight: "700" },
-
-  // ── Mode Switcher ──
-  modeSwitcherCard: {
-    marginHorizontal: 14,
-    marginTop: 10,
-    borderRadius: 12,
-    padding: 14,
-  },
-  modeSwitcherTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    marginBottom: 10,
-  },
-  modeRow: {
-    flexDirection: "row",
-    borderRadius: 10,
-    padding: 4,
-    gap: 4,
-  },
-  modeBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  modeBtnText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  modeInfoBanner: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 7,
-    marginTop: 10,
-    borderRadius: 8,
-    padding: 10,
-  },
-  modeInfoText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-  },
-
-  // ── Locked Qty Card (complete mode) ──
-  lockedQtyCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginHorizontal: 14,
-    marginTop: 10,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1.5,
-  },
-  lockedQtyLabel: { fontSize: 12, fontWeight: "600" },
-  lockedQtyValue: { fontSize: 20, fontWeight: "900", marginTop: 2 },
-
-  partialBanner: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    marginHorizontal: 14,
-    marginTop: 8,
-    borderRadius: 8,
-    padding: 10,
-  },
-  partialBannerText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-  },
-  fieldsCard: {
-    marginHorizontal: 14,
-    marginTop: 10,
-    borderRadius: 12,
-    padding: 14,
-  },
+  modeSwitcherCard: { marginHorizontal: 14, marginTop: 10, borderRadius: 12, padding: 14 },
+  modeSwitcherTitle: { fontSize: 12, fontWeight: "700", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.4 },
+  modeRow: { flexDirection: "row", borderRadius: 10, padding: 4, gap: 4 },
+  modeBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 11, borderRadius: 8 },
+  modeBtnText: { fontSize: 12, fontWeight: "700" },
+  modeBanner: { flexDirection: "row", alignItems: "flex-start", gap: 7, marginTop: 10, borderRadius: 8, padding: 10 },
+  modeBannerText: { flex: 1, fontSize: 12, fontWeight: "500", lineHeight: 18 },
+  remainingBanner: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 14, marginTop: 8, borderRadius: 8, padding: 10 },
+  remainingBannerText: { flex: 1, fontSize: 12, fontWeight: "600" },
+  fieldsCard: { marginHorizontal: 14, marginTop: 10, borderRadius: 12, padding: 14 },
   field: { marginBottom: 14 },
   fieldLabel: { fontSize: 13, fontWeight: "600", marginBottom: 6 },
   fieldError: { fontSize: 11, fontWeight: "600", marginTop: 4 },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderRadius: 10,
-  },
+  inputRow: { flexDirection: "row", alignItems: "center", borderWidth: 1.5, borderRadius: 10 },
   input: { flex: 1, padding: 11, fontSize: 15 },
   inputSuffix: { paddingRight: 12, fontSize: 13, fontWeight: "700" },
-  qtyProgress: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 6,
-  },
+  qtyProgress: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },
   qtyProgressBg: { flex: 1, height: 6, borderRadius: 3 },
   qtyProgressFill: { height: 6, borderRadius: 3 },
   qtyProgressText: { fontSize: 11, fontWeight: "700", width: 36 },
-  calcCard: {
-    marginHorizontal: 14,
-    marginTop: 10,
-    borderRadius: 12,
-    padding: 14,
-  },
-  calcTitle: {
-    fontSize: 12,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 10,
-  },
-  calcRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-  },
-  calcRowTotal: {
-    borderBottomWidth: 0,
-    marginTop: 4,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-  },
+  calcCard: { marginHorizontal: 14, marginTop: 10, borderRadius: 12, padding: 14 },
+  calcTitle: { fontSize: 12, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 },
+  calcRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderBottomWidth: 1 },
+  calcRowTotal: { borderBottomWidth: 0, marginTop: 4, borderRadius: 8, paddingHorizontal: 10 },
   calcLabel: { fontSize: 13 },
   calcVal: { fontSize: 14, fontWeight: "700" },
-  dueDateCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginHorizontal: 14,
-    marginTop: 10,
-    borderRadius: 10,
-    padding: 12,
-  },
+  dueDateCard: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 14, marginTop: 10, borderRadius: 10, padding: 12 },
   dueDateLabel: { fontSize: 12, fontWeight: "600" },
-  dueDateInput: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "700",
-    borderWidth: 1,
-    borderRadius: 6,
-    padding: 6,
-  },
-  notesCard: {
-    marginHorizontal: 14,
-    marginTop: 10,
-    borderRadius: 12,
-    padding: 14,
-  },
-  notesInput: {
-    borderWidth: 1.5,
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 14,
-    minHeight: 60,
-    textAlignVertical: "top",
-  },
+  dueDateInput: { flex: 1, fontSize: 14, fontWeight: "700", borderWidth: 1, borderRadius: 6, padding: 6 },
+  notesCard: { marginHorizontal: 14, marginTop: 10, borderRadius: 12, padding: 14 },
+  notesInput: { borderWidth: 1.5, borderRadius: 8, padding: 10, fontSize: 14, minHeight: 60, textAlignVertical: "top" },
   footer: { padding: 14, borderTopWidth: 1 },
-  submitBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderRadius: 12,
-    paddingVertical: 15,
-  },
+  submitBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 12, paddingVertical: 15 },
   submitBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
 });
