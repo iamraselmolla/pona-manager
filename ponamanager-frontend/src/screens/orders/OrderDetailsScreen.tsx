@@ -12,6 +12,7 @@ import {
   StatusBar,
   SafeAreaView,
   Pressable,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -218,6 +219,8 @@ export const OrderDetailsScreen = () => {
   const { orderId } = route.params;
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const colorScheme = useColorScheme();
   const theme = colorScheme === "dark" ? darkTheme : lightTheme;
@@ -241,27 +244,26 @@ export const OrderDetailsScreen = () => {
       });
   }, [orderId]);
 
-  const handleCancel = async () => {
+  const confirmCancel = async () => {
+    if (!order) return;
     const isInBatch = order.status === "in_batch";
-    console.log("order.id:", order.id);
-    console.log("order.batchId:", order.batchId);
-
     try {
+      setCancelling(true);
+
       if (isInBatch && order.batchId) {
-        console.log("Removing from batch...");
-        const unbatch = await batchAPI.removeOrder(order.batchId, order.id);
-        console.log("Unbatch result:", JSON.stringify(unbatch?.data));
+        await batchAPI.removeOrder(order.batchId, order.id);
       }
 
-      console.log("Cancelling order...");
-      const result = await orderAPI.cancel(orderId);
-      console.log("Cancel result:", JSON.stringify(result?.data));
+      await orderAPI.cancel(orderId);
 
       setOrder((prev) => (prev ? { ...prev, status: "cancelled" } : null));
+      setConfirmVisible(false);
       navigation.goBack();
     } catch (e: any) {
-      console.error("Failed URL:", e?.config?.url);
-      console.error("Failed:", JSON.stringify(e?.response?.data));
+      console.error("Cancel failed:", e);
+      Alert.alert("Error", e?.response?.data?.message || "Failed to cancel order");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -727,7 +729,7 @@ export const OrderDetailsScreen = () => {
               </Pressable>
 
               <Pressable
-                onPress={handleCancel}
+                onPress={() => setConfirmVisible(true)}
                 style={({ pressed }) => ({
                   flexDirection: "row",
                   alignItems: "center",
@@ -784,6 +786,46 @@ export const OrderDetailsScreen = () => {
 )}
 
         {/* ── Footer meta ── */}
+        <Modal
+          visible={confirmVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => !cancelling && setConfirmVisible(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 20 }} pointerEvents={cancelling ? "none" : "auto"}>
+            <View style={{ width: "100%", maxWidth: 380, backgroundColor: theme.surface, borderRadius: 20, padding: 22, elevation: 10 }}>
+              <Text style={{ fontSize: 20, fontWeight: "700", marginBottom: 12, color: theme.text }}>Cancel Order</Text>
+
+              <Text style={{ fontSize: 16, color: theme.text2, lineHeight: 24 }}>
+                {order?.status === "in_batch"
+                  ? `"${order?.customerName}" is in a batch. It will be removed from the batch and then cancelled.`
+                  : "Are you sure you want to cancel this order?"}
+              </Text>
+
+              <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 24, gap: 12 }}>
+                <TouchableOpacity
+                  style={{ paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12, minWidth: 100, alignItems: "center", backgroundColor: theme.surface2 }}
+                  onPress={() => setConfirmVisible(false)}
+                  disabled={cancelling}
+                >
+                  <Text style={{ fontWeight: "600", color: theme.text }}>No</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{ paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12, minWidth: 100, alignItems: "center", backgroundColor: theme.danger }}
+                  onPress={confirmCancel}
+                  disabled={cancelling}
+                >
+                  {cancelling ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={{ fontWeight: "700", color: "#fff" }}>Yes, Cancel</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
         <View style={{ alignItems: "center", paddingTop: 24, gap: 3 }}>
           <Text style={{ fontSize: 11, color: theme.text3 }}>
             Order ID: {order.id}
