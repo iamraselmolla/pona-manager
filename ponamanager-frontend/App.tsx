@@ -7,6 +7,7 @@ import Toast from "react-native-toast-message";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { useAuthStore } from "./src/store/authStore";
 import { initDatabase } from "./src/utils/database";
+import { AppModalProvider } from "./src/utils/AppModal";
 
 export default function App() {
   const { loadToken } = useAuthStore();
@@ -23,11 +24,13 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer>
-          <StatusBar style="light" />
-          <RootNavigator />
-          <Toast />
-        </NavigationContainer>
+        <AppModalProvider>
+          <NavigationContainer>
+            <StatusBar style="light" />
+            <RootNavigator />
+            <Toast />
+          </NavigationContainer>
+        </AppModalProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
