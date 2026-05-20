@@ -94,7 +94,16 @@ const getStatusConfig = (T: typeof LIGHT) => ({
     bg: T.infoSoft,
     icon: "git-branch-outline" as const,
   },
+  closed: {
+    label: "বন্ধ",
+    color: T.textMuted,
+    bg: T.border,
+    icon: "lock-closed-outline" as const,
+  },
 });
+
+// ─── Delivery Mode Type ────────────────────────────────────────────────────────
+type DeliveryMode = "complete" | "partial";
 
 // ─── Delivery Modal ────────────────────────────────────────────────────────────
 const DeliveryModal = ({
@@ -111,23 +120,33 @@ const DeliveryModal = ({
   saving: boolean;
 }) => {
   const T = useTheme();
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("complete");
   const [deliveredQty, setDeliveredQty] = useState("");
   const [deliveryRate, setDeliveryRate] = useState("");
   const [payment, setPayment] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
-  const [isPartial, setIsPartial] = useState(false);
 
   useEffect(() => {
     if (batchOrder) {
+      setDeliveryMode("complete");
       setDeliveredQty(batchOrder.order.plQuantity.toString());
       setDeliveryRate(batchOrder.order.unitRate.toString());
       setPayment("");
       setDueDate("");
       setNotes("");
-      setIsPartial(false);
     }
   }, [batchOrder]);
+
+  // When mode switches, reset qty
+  useEffect(() => {
+    if (!batchOrder) return;
+    if (deliveryMode === "complete") {
+      setDeliveredQty(batchOrder.order.plQuantity.toString());
+    } else {
+      setDeliveredQty("");
+    }
+  }, [deliveryMode]);
 
   if (!batchOrder) return null;
 
@@ -140,40 +159,57 @@ const DeliveryModal = ({
   const finalAmt = delivered * rate;
   const totalPaid = advance + paid;
   const dueAmt = Math.max(0, finalAmt - totalPaid);
-  const isActuallyPartial = delivered < orderedQty && delivered > 0;
   const typeColor = getPonaTypeColor(batchOrder.order.ponaType) ?? T.accent;
 
+  // In partial mode, delivered must be < orderedQty and > 0
+  const partialValid =
+    deliveryMode === "partial" && delivered > 0 && delivered < orderedQty;
+  // In complete mode, delivered == orderedQty always
+  const completeValid = deliveryMode === "complete";
+
   const handleSubmit = () => {
-    if (!deliveredQty || delivered <= 0) {
-      Alert.alert("সতর্কতা", "ডেলিভারি পরিমাণ দিন");
-      return;
-    }
     if (!deliveryRate || rate <= 0) {
       Alert.alert("সতর্কতা", "দর দিন");
       return;
     }
-    if (delivered > orderedQty) {
-      Alert.alert("সতর্কতা", `সর্বোচ্চ ${orderedQty} PL`);
-      return;
+    if (deliveryMode === "partial") {
+      if (!deliveredQty || delivered <= 0) {
+        Alert.alert("সতর্কতা", "ডেলিভারি পরিমাণ দিন");
+        return;
+      }
+      if (delivered >= orderedQty) {
+        Alert.alert(
+          "সতর্কতা",
+          `আংশিক ডেলিভারিতে ${orderedQty} PL এর কম দিতে হবে। পুরো দিতে চাইলে "সম্পূর্ণ ডেলিভারি" বেছে নিন।`,
+        );
+        return;
+      }
     }
+
+    const finalDelivered =
+      deliveryMode === "complete" ? orderedQty : delivered;
+    const isPartial = deliveryMode === "partial";
+    const isClose = deliveryMode === "complete"; // close the order, no new partial
+
     Alert.alert(
-      isActuallyPartial ? "আংশিক ডেলিভারি" : "ডেলিভারি নিশ্চিত",
-      isActuallyPartial
-        ? `${delivered.toLocaleString()} PL ডেলিভারি হবে।\nবাকি ${remaining.toLocaleString()} PL নতুন অর্ডার হিসেবে যোগ হবে।\n\nনিশ্চিত করুন?`
-        : `${delivered.toLocaleString()} PL ডেলিভারি নিশ্চিত করুন?`,
+      isPartial ? "আংশিক ডেলিভারি" : "সম্পূর্ণ ডেলিভারি নিশ্চিত",
+      isPartial
+        ? `${finalDelivered.toLocaleString()} PL ডেলিভারি হবে।\nবাকি ${remaining.toLocaleString()} PL নতুন অর্ডার হিসেবে যোগ হবে।\n\nনিশ্চিত করুন?`
+        : `${finalDelivered.toLocaleString()} PL ডেলিভারি করে অর্ডারটি বন্ধ করবেন?\n\n(নতুন কোনো অর্ডার তৈরি হবে না)`,
       [
         { text: "না", style: "cancel" },
         {
           text: "হ্যাঁ",
           onPress: () =>
             onSubmit({
-              deliveredQuantity: delivered,
+              deliveredQuantity: finalDelivered,
               deliveryRate: rate,
               customerPayment: paid,
               dueAmount: dueAmt,
               duePaymentDate: dueAmt > 0 ? dueDate : undefined,
-              isPartial: isActuallyPartial,
-              remainingQuantity: isActuallyPartial ? remaining : 0,
+              isPartial,
+              isClose,
+              remainingQuantity: isPartial ? remaining : 0,
               notes,
             }),
         },
@@ -276,120 +312,228 @@ const DeliveryModal = ({
               ))}
             </View>
 
-            {/* Partial toggle */}
+            {/* ── Delivery Mode Switcher ── */}
             <View
-              style={[
-                mStyles.partialToggleCard,
-                { backgroundColor: T.surface },
-              ]}
+              style={[mStyles.modeSwitcherCard, { backgroundColor: T.surface }]}
             >
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[mStyles.partialToggleTitle, { color: T.textPrimary }]}
+              <Text style={[mStyles.modeSwitcherTitle, { color: T.textPrimary }]}>
+                ডেলিভারির ধরন
+              </Text>
+              <View style={[mStyles.modeRow, { backgroundColor: T.bg }]}>
+                {/* Complete mode */}
+                <TouchableOpacity
+                  style={[
+                    mStyles.modeBtn,
+                    deliveryMode === "complete" && {
+                      backgroundColor: T.success,
+                    },
+                  ]}
+                  onPress={() => setDeliveryMode("complete")}
+                  activeOpacity={0.8}
                 >
-                  আংশিক ডেলিভারি?
-                </Text>
-                <Text
-                  style={[mStyles.partialToggleSub, { color: T.textSecondary }]}
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={16}
+                    color={
+                      deliveryMode === "complete" ? "#fff" : T.textSecondary
+                    }
+                  />
+                  <Text
+                    style={[
+                      mStyles.modeBtnText,
+                      {
+                        color:
+                          deliveryMode === "complete" ? "#fff" : T.textSecondary,
+                      },
+                    ]}
+                  >
+                    সম্পূর্ণ ডেলিভারি
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Partial mode */}
+                <TouchableOpacity
+                  style={[
+                    mStyles.modeBtn,
+                    deliveryMode === "partial" && {
+                      backgroundColor: T.info,
+                    },
+                  ]}
+                  onPress={() => setDeliveryMode("partial")}
+                  activeOpacity={0.8}
                 >
-                  পুরো পরিমাণ দিতে না পারলে
-                </Text>
+                  <Ionicons
+                    name="git-branch-outline"
+                    size={16}
+                    color={
+                      deliveryMode === "partial" ? "#fff" : T.textSecondary
+                    }
+                  />
+                  <Text
+                    style={[
+                      mStyles.modeBtnText,
+                      {
+                        color:
+                          deliveryMode === "partial" ? "#fff" : T.textSecondary,
+                      },
+                    ]}
+                  >
+                    আংশিক ডেলিভারি
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={[
-                  mStyles.toggleBtn,
-                  { backgroundColor: T.border },
-                  isPartial && { backgroundColor: T.info },
-                ]}
-                onPress={() => {
-                  setIsPartial(!isPartial);
-                  if (!isPartial) setDeliveredQty("");
-                  else setDeliveredQty(orderedQty.toString());
-                }}
-              >
+
+              {/* Mode description */}
+              {deliveryMode === "complete" ? (
                 <View
                   style={[
-                    mStyles.toggleThumb,
-                    isPartial && mStyles.toggleThumbOn,
+                    mStyles.modeInfoBanner,
+                    { backgroundColor: T.successSoft },
                   ]}
-                />
-              </TouchableOpacity>
+                >
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={14}
+                    color={T.success}
+                  />
+                  <Text
+                    style={[mStyles.modeInfoText, { color: T.success }]}
+                  >
+                    পুরো {orderedQty.toLocaleString()} PL ডেলিভারি হবে এবং অর্ডার বন্ধ হয়ে যাবে। কোনো নতুন অর্ডার তৈরি হবে না।
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  style={[
+                    mStyles.modeInfoBanner,
+                    { backgroundColor: T.infoSoft },
+                  ]}
+                >
+                  <Ionicons
+                    name="information-circle"
+                    size={14}
+                    color={T.info}
+                  />
+                  <Text
+                    style={[mStyles.modeInfoText, { color: T.info }]}
+                  >
+                    কিছু PL ডেলিভারি করুন। বাকি PL স্বয়ংক্রিয়ভাবে নতুন pending অর্ডার হিসেবে যোগ হবে।
+                  </Text>
+                </View>
+              )}
             </View>
 
-            {/* Partial banner */}
-            {isActuallyPartial && (
+            {/* Partial remaining preview banner */}
+            {deliveryMode === "partial" && delivered > 0 && delivered < orderedQty && (
               <View
                 style={[mStyles.partialBanner, { backgroundColor: T.infoSoft }]}
               >
-                <Ionicons name="information-circle" size={16} color={T.info} />
+                <Ionicons name="arrow-forward-circle" size={16} color={T.info} />
                 <Text style={[mStyles.partialBannerText, { color: T.info }]}>
-                  বাকি {remaining.toLocaleString()} PL স্বয়ংক্রিয়ভাবে নতুন
-                  pending অর্ডার হিসেবে যোগ হবে
+                  বাকি {remaining.toLocaleString()} PL নতুন pending অর্ডার হিসেবে যোগ হবে
                 </Text>
+              </View>
+            )}
+
+            {/* Complete mode: qty locked, just show */}
+            {deliveryMode === "complete" && (
+              <View
+                style={[
+                  mStyles.lockedQtyCard,
+                  {
+                    backgroundColor: T.successSoft,
+                    borderColor: T.success,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="checkmark-done-circle"
+                  size={22}
+                  color={T.success}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[mStyles.lockedQtyLabel, { color: T.success }]}
+                  >
+                    ডেলিভারিকৃত পরিমাণ (নির্ধারিত)
+                  </Text>
+                  <Text style={[mStyles.lockedQtyValue, { color: T.success }]}>
+                    {orderedQty.toLocaleString()} PL
+                  </Text>
+                </View>
               </View>
             )}
 
             {/* Fields */}
             <View style={[mStyles.fieldsCard, { backgroundColor: T.surface }]}>
-              {/* Delivered qty */}
-              <View style={mStyles.field}>
-                <Text style={[mStyles.fieldLabel, { color: T.textSecondary }]}>
-                  ডেলিভারিকৃত পরিমাণ
-                  {isPartial ? (
-                    <Text style={{ color: T.info }}> (আংশিক)</Text>
-                  ) : (
-                    ""
-                  )}
-                </Text>
-                <View
-                  style={[
-                    mStyles.inputRow,
-                    { borderColor: T.border, backgroundColor: T.inputBg },
-                  ]}
-                >
-                  <TextInput
-                    style={[mStyles.input, { color: T.textPrimary }]}
-                    value={deliveredQty}
-                    onChangeText={setDeliveredQty}
-                    keyboardType="numeric"
-                    placeholder={`সর্বোচ্চ ${orderedQty.toLocaleString()}`}
-                    placeholderTextColor={T.textMuted}
-                  />
-                  <Text style={[mStyles.inputSuffix, { color: T.textMuted }]}>
-                    PL
+              {/* Delivered qty — only editable in partial mode */}
+              {deliveryMode === "partial" && (
+                <View style={mStyles.field}>
+                  <Text
+                    style={[mStyles.fieldLabel, { color: T.textSecondary }]}
+                  >
+                    ডেলিভারিকৃত পরিমাণ{" "}
+                    <Text style={{ color: T.info }}>(আংশিক)</Text>
                   </Text>
-                </View>
-                {delivered > 0 && (
-                  <View style={mStyles.qtyProgress}>
-                    <View
-                      style={[
-                        mStyles.qtyProgressBg,
-                        { backgroundColor: T.border },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          mStyles.qtyProgressFill,
-                          {
-                            width: `${Math.min((delivered / orderedQty) * 100, 100)}%`,
-                            backgroundColor: isActuallyPartial
-                              ? T.info
-                              : T.success,
-                          },
-                        ]}
-                      />
-                    </View>
-                    <Text
-                      style={[
-                        mStyles.qtyProgressText,
-                        { color: T.textSecondary },
-                      ]}
-                    >
-                      {((delivered / orderedQty) * 100).toFixed(0)}%
+                  <View
+                    style={[
+                      mStyles.inputRow,
+                      { borderColor: T.border, backgroundColor: T.inputBg },
+                    ]}
+                  >
+                    <TextInput
+                      style={[mStyles.input, { color: T.textPrimary }]}
+                      value={deliveredQty}
+                      onChangeText={setDeliveredQty}
+                      keyboardType="numeric"
+                      placeholder={`সর্বোচ্চ ${(orderedQty - 1).toLocaleString()}`}
+                      placeholderTextColor={T.textMuted}
+                    />
+                    <Text style={[mStyles.inputSuffix, { color: T.textMuted }]}>
+                      PL
                     </Text>
                   </View>
-                )}
-              </View>
+                  {delivered > 0 && (
+                    <View style={mStyles.qtyProgress}>
+                      <View
+                        style={[
+                          mStyles.qtyProgressBg,
+                          { backgroundColor: T.border },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            mStyles.qtyProgressFill,
+                            {
+                              width: `${Math.min((delivered / orderedQty) * 100, 100)}%`,
+                              backgroundColor:
+                                delivered >= orderedQty ? T.danger : T.info,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text
+                        style={[
+                          mStyles.qtyProgressText,
+                          {
+                            color:
+                              delivered >= orderedQty ? T.danger : T.textSecondary,
+                          },
+                        ]}
+                      >
+                        {((delivered / orderedQty) * 100).toFixed(0)}%
+                      </Text>
+                    </View>
+                  )}
+                  {delivered >= orderedQty && (
+                    <Text
+                      style={[mStyles.fieldError, { color: T.danger }]}
+                    >
+                      আংশিক ডেলিভারিতে {orderedQty} PL এর কম দিতে হবে
+                    </Text>
+                  )}
+                </View>
+              )}
 
               {/* Rate */}
               <View style={mStyles.field}>
@@ -449,8 +593,10 @@ const DeliveryModal = ({
               </Text>
               {[
                 {
-                  label: `মোট মূল্য (${delivered.toLocaleString()} × ${rate})`,
-                  val: formatCurrency(finalAmt),
+                  label: `মোট মূল্য (${(deliveryMode === "complete" ? orderedQty : delivered).toLocaleString()} × ${rate})`,
+                  val: formatCurrency(
+                    (deliveryMode === "complete" ? orderedQty : delivered) * rate,
+                  ),
                   color: T.textPrimary,
                 },
                 {
@@ -503,29 +649,67 @@ const DeliveryModal = ({
                   {formatCurrency(dueAmt)}
                 </Text>
               </View>
-              {isActuallyPartial && (
+
+              {/* Partial remaining qty row */}
+              {deliveryMode === "partial" &&
+                delivered > 0 &&
+                delivered < orderedQty && (
+                  <View
+                    style={[
+                      mStyles.calcRow,
+                      {
+                        backgroundColor: T.infoSoft,
+                        borderRadius: 8,
+                        paddingHorizontal: 10,
+                        marginTop: 6,
+                      },
+                    ]}
+                  >
+                    <Text style={[mStyles.calcLabel, { color: T.info }]}>
+                      নতুন অর্ডার (বাকি PL)
+                    </Text>
+                    <Text
+                      style={[
+                        mStyles.calcVal,
+                        { color: T.info, fontWeight: "800" },
+                      ]}
+                    >
+                      {remaining.toLocaleString()} PL
+                    </Text>
+                  </View>
+                )}
+
+              {/* Complete: closed label */}
+              {deliveryMode === "complete" && (
                 <View
                   style={[
                     mStyles.calcRow,
                     {
-                      backgroundColor: T.infoSoft,
+                      backgroundColor: T.successSoft,
                       borderRadius: 8,
                       paddingHorizontal: 10,
                       marginTop: 6,
                     },
                   ]}
                 >
-                  <Text style={[mStyles.calcLabel, { color: T.info }]}>
-                    নতুন অর্ডার (বাকি PL)
+                  <Text style={[mStyles.calcLabel, { color: T.success }]}>
+                    অর্ডার স্ট্যাটাস
                   </Text>
-                  <Text
-                    style={[
-                      mStyles.calcVal,
-                      { color: T.info, fontWeight: "800" },
-                    ]}
-                  >
-                    {remaining.toLocaleString()} PL
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Ionicons
+                      name="lock-closed-outline"
+                      size={13}
+                      color={T.success}
+                    />
+                    <Text
+                      style={[
+                        mStyles.calcVal,
+                        { color: T.success, fontWeight: "800" },
+                      ]}
+                    >
+                      বন্ধ হবে
+                    </Text>
+                  </View>
                 </View>
               )}
             </View>
@@ -533,9 +717,16 @@ const DeliveryModal = ({
             {/* Due date */}
             {dueAmt > 0 && (
               <View
-                style={[mStyles.dueDateCard, { backgroundColor: T.dangerSoft }]}
+                style={[
+                  mStyles.dueDateCard,
+                  { backgroundColor: T.dangerSoft },
+                ]}
               >
-                <Ionicons name="calendar-outline" size={16} color={T.danger} />
+                <Ionicons
+                  name="calendar-outline"
+                  size={16}
+                  color={T.danger}
+                />
                 <Text style={[mStyles.dueDateLabel, { color: T.danger }]}>
                   বাকি পরিশোধের তারিখ
                 </Text>
@@ -579,7 +770,13 @@ const DeliveryModal = ({
             ]}
           >
             <TouchableOpacity
-              style={[mStyles.submitBtn, { backgroundColor: T.success }]}
+              style={[
+                mStyles.submitBtn,
+                {
+                  backgroundColor:
+                    deliveryMode === "complete" ? T.success : T.info,
+                },
+              ]}
               onPress={handleSubmit}
               disabled={saving}
             >
@@ -589,17 +786,17 @@ const DeliveryModal = ({
                 <>
                   <Ionicons
                     name={
-                      isActuallyPartial
-                        ? "git-branch-outline"
-                        : "checkmark-circle"
+                      deliveryMode === "complete"
+                        ? "lock-closed"
+                        : "git-branch-outline"
                     }
                     size={20}
                     color="#fff"
                   />
                   <Text style={mStyles.submitBtnText}>
-                    {isActuallyPartial
-                      ? "আংশিক ডেলিভারি নিশ্চিত"
-                      : "ডেলিভারি নিশ্চিত করুন"}
+                    {deliveryMode === "complete"
+                      ? "সম্পূর্ণ ডেলিভারি ও অর্ডার বন্ধ"
+                      : "আংশিক ডেলিভারি নিশ্চিত"}
                   </Text>
                 </>
               )}
@@ -633,6 +830,7 @@ const BatchOrderRow = ({
         rowStyles.card,
         { backgroundColor: T.surface },
         batchOrder.deliveryStatus === "delivered" && rowStyles.cardDone,
+        batchOrder.deliveryStatus === "closed" && rowStyles.cardClosed,
       ]}
     >
       <View style={[rowStyles.typeBar, { backgroundColor: typeColor }]} />
@@ -677,6 +875,21 @@ const BatchOrderRow = ({
               </Text>
             </View>
           )}
+          {batchOrder.deliveryStatus === "closed" && (
+            <View
+              style={[
+                rowStyles.partialBadge,
+                { backgroundColor: T.border },
+              ]}
+            >
+              <Ionicons name="lock-closed-outline" size={9} color={T.textMuted} />
+              <Text
+                style={[rowStyles.partialBadgeText, { color: T.textMuted }]}
+              >
+                বন্ধ
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Financial info after delivery */}
@@ -712,7 +925,7 @@ const BatchOrderRow = ({
           </View>
         )}
 
-        {/* Action buttons */}
+        {/* Action buttons — only for pending */}
         {batchOrder.deliveryStatus === "pending" && (
           <View style={rowStyles.actionRow}>
             <TouchableOpacity
@@ -756,8 +969,8 @@ export const BatchDetailsScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
-const [selectedOrder, setSelectedOrder] = useState<BatchOrder | null>(null);
-const [unbatchloading, setUnbatchLoading] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<BatchOrder | null>(null);
+  const [unbatchloading, setUnbatchLoading] = useState(false);
 
   const fetchBatch = useCallback(async () => {
     try {
@@ -775,29 +988,25 @@ const [unbatchloading, setUnbatchLoading] = useState(false);
     fetchBatch();
   }, []);
 
- const handleUnbatch = (bo: BatchOrder) => {
-  setSelectedOrder(bo);
-  setConfirmVisible(true);
-};
+  const handleUnbatch = (bo: BatchOrder) => {
+    setSelectedOrder(bo);
+    setConfirmVisible(true);
+  };
 
-const confirmUnbatch = async () => {
-  if (!selectedOrder) return;
-
-  try {
-    setUnbatchLoading(true);
-
-    await batchAPI.removeOrder(batchId, selectedOrder.id);
-
-    setConfirmVisible(false);
-    setSelectedOrder(null);
-
-    fetchBatch();
-  } catch {
-    alert("আনব্যাচ ব্যর্থ হয়েছে");
-  } finally {
-    setUnbatchLoading(false);
-  }
-};
+  const confirmUnbatch = async () => {
+    if (!selectedOrder) return;
+    try {
+      setUnbatchLoading(true);
+      await batchAPI.removeOrder(batchId, selectedOrder.id);
+      setConfirmVisible(false);
+      setSelectedOrder(null);
+      fetchBatch();
+    } catch {
+      alert("আনব্যাচ ব্যর্থ হয়েছে");
+    } finally {
+      setUnbatchLoading(false);
+    }
+  };
 
   const handleDeliverySubmit = async (data: any) => {
     if (!selectedBO) return;
@@ -809,9 +1018,11 @@ const confirmUnbatch = async () => {
       await fetchBatch();
       Alert.alert(
         "সফল!",
-        data.isPartial
-          ? `আংশিক ডেলিভারি সম্পন্ন। বাকি ${data.remainingQuantity.toLocaleString()} PL নতুন অর্ডার হিসেবে যোগ হয়েছে।`
-          : "ডেলিভারি সম্পন্ন হয়েছে!",
+        data.isClose
+          ? `ডেলিভারি সম্পন্ন। অর্ডারটি বন্ধ করা হয়েছে।`
+          : data.isPartial
+            ? `আংশিক ডেলিভারি সম্পন্ন। বাকি ${data.remainingQuantity.toLocaleString()} PL নতুন অর্ডার হিসেবে যোগ হয়েছে।`
+            : "ডেলিভারি সম্পন্ন হয়েছে!",
       );
     } catch (err: any) {
       Alert.alert(
@@ -1105,48 +1316,48 @@ const confirmUnbatch = async () => {
           )}
         </View>
       )}
+
+      {/* ── Unbatch Confirm Modal ── */}
       <Modal
-  visible={confirmVisible}
-  transparent
-  animationType="fade"
-  onRequestClose={() => !unbatchloading && setConfirmVisible(false)}
->
-  <View style={styles.overlay} pointerEvents={unbatchloading ? "none" : "auto"}>
-    <View style={styles.modalCard}>
-      <Text style={styles.title}>আনব্যাচ করুন</Text>
-
-      <Text style={styles.message}>
-        "{selectedOrder?.order.customerName}" এর অর্ডারটি ব্যাচ থেকে সরাতে চান?
-      </Text>
-
-      <Text style={styles.subMessage}>
-        অর্ডারটি pending হয়ে যাবে।
-      </Text>
-
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={[styles.button, styles.cancelBtn]}
-          onPress={() => setConfirmVisible(false)}
-          disabled={unbatchloading}
+        visible={confirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !unbatchloading && setConfirmVisible(false)}
+      >
+        <View
+          style={styles.overlay}
+          pointerEvents={unbatchloading ? "none" : "auto"}
         >
-          <Text style={styles.cancelText}>না</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.button, styles.deleteBtn]}
-          onPress={confirmUnbatch}
-          disabled={unbatchloading}
-        >
-          {unbatchloading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.deleteText}>হ্যাঁ, সরাও</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-</Modal>
+          <View style={styles.modalCard}>
+            <Text style={styles.title}>আনব্যাচ করুন</Text>
+            <Text style={styles.message}>
+              "{selectedOrder?.order.customerName}" এর অর্ডারটি ব্যাচ থেকে
+              সরাতে চান?
+            </Text>
+            <Text style={styles.subMessage}>অর্ডারটি pending হয়ে যাবে।</Text>
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelBtn]}
+                onPress={() => setConfirmVisible(false)}
+                disabled={unbatchloading}
+              >
+                <Text style={styles.cancelText}>না</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.deleteBtn]}
+                onPress={confirmUnbatch}
+                disabled={unbatchloading}
+              >
+                {unbatchloading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.deleteText}>হ্যাঁ, সরাও</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <DeliveryModal
         visible={modalVisible}
@@ -1162,16 +1373,15 @@ const confirmUnbatch = async () => {
   );
 };
 
-// ─── Styles (color-neutral) ────────────────────────────────────────────────────
+// ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-    overlay: {
+  overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
   },
-
   modalCard: {
     width: "100%",
     maxWidth: 380,
@@ -1180,33 +1390,15 @@ const styles = StyleSheet.create({
     padding: 22,
     elevation: 10,
   },
-
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 12,
-    color: "#111",
-  },
-
-  message: {
-    fontSize: 16,
-    color: "#333",
-    lineHeight: 24,
-  },
-
-  subMessage: {
-    marginTop: 10,
-    fontSize: 14,
-    color: "#777",
-  },
-
+  title: { fontSize: 20, fontWeight: "700", marginBottom: 12, color: "#111" },
+  message: { fontSize: 16, color: "#333", lineHeight: 24 },
+  subMessage: { marginTop: 10, fontSize: 14, color: "#777" },
   actions: {
     flexDirection: "row",
     justifyContent: "flex-end",
     marginTop: 24,
     gap: 12,
   },
-
   button: {
     paddingVertical: 12,
     paddingHorizontal: 18,
@@ -1214,24 +1406,10 @@ const styles = StyleSheet.create({
     minWidth: 100,
     alignItems: "center",
   },
-
-  cancelBtn: {
-    backgroundColor: "#f1f1f1",
-  },
-
-  deleteBtn: {
-    backgroundColor: "#e53935",
-  },
-
-  cancelText: {
-    fontWeight: "600",
-    color: "#333",
-  },
-
-  deleteText: {
-    fontWeight: "700",
-    color: "#fff",
-  },
+  cancelBtn: { backgroundColor: "#f1f1f1" },
+  deleteBtn: { backgroundColor: "#e53935" },
+  cancelText: { fontWeight: "600", color: "#333" },
+  deleteText: { fontWeight: "700", color: "#fff" },
   container: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   headerCard: { padding: 16, borderBottomWidth: 1 },
@@ -1341,6 +1519,7 @@ const rowStyles = StyleSheet.create({
     elevation: 1,
   },
   cardDone: { opacity: 0.85 },
+  cardClosed: { opacity: 0.7 },
   typeBar: { width: 5, alignSelf: "stretch" },
   top: {
     flexDirection: "row",
@@ -1370,7 +1549,14 @@ const rowStyles = StyleSheet.create({
   typePill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   typeText: { fontSize: 10, fontWeight: "700" },
   qty: { fontSize: 12, fontWeight: "600" },
-  partialBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
+  partialBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
   partialBadgeText: { fontSize: 9, fontWeight: "700" },
   deliveredInfo: { paddingBottom: 10, paddingRight: 10, marginTop: 4, gap: 2 },
   deliveredInfoItem: { fontSize: 12 },
@@ -1432,30 +1618,67 @@ const mStyles = StyleSheet.create({
   infoValue: { fontSize: 13, fontWeight: "700" },
   typePill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   typePillText: { fontSize: 11, fontWeight: "700" },
-  partialToggleCard: {
-    flexDirection: "row",
-    alignItems: "center",
+
+  // ── Mode Switcher ──
+  modeSwitcherCard: {
     marginHorizontal: 14,
     marginTop: 10,
     borderRadius: 12,
     padding: 14,
   },
-  partialToggleTitle: { fontSize: 14, fontWeight: "700" },
-  partialToggleSub: { fontSize: 11, marginTop: 2 },
-  toggleBtn: {
-    width: 48,
-    height: 28,
-    borderRadius: 14,
+  modeSwitcherTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: 10,
+  },
+  modeRow: {
+    flexDirection: "row",
+    borderRadius: 10,
+    padding: 4,
+    gap: 4,
+  },
+  modeBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 3,
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
-  toggleThumb: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "#fff",
+  modeBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
-  toggleThumbOn: { alignSelf: "flex-end" },
+  modeInfoBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 7,
+    marginTop: 10,
+    borderRadius: 8,
+    padding: 10,
+  },
+  modeInfoText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+  },
+
+  // ── Locked Qty Card (complete mode) ──
+  lockedQtyCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginHorizontal: 14,
+    marginTop: 10,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1.5,
+  },
+  lockedQtyLabel: { fontSize: 12, fontWeight: "600" },
+  lockedQtyValue: { fontSize: 20, fontWeight: "900", marginTop: 2 },
+
   partialBanner: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -1479,6 +1702,7 @@ const mStyles = StyleSheet.create({
   },
   field: { marginBottom: 14 },
   fieldLabel: { fontSize: 13, fontWeight: "600", marginBottom: 6 },
+  fieldError: { fontSize: 11, fontWeight: "600", marginTop: 4 },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
