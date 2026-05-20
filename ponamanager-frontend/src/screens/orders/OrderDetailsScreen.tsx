@@ -221,6 +221,8 @@ export const OrderDetailsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [deleteVisible, setDeleteVisible] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const colorScheme = useColorScheme();
   const theme = colorScheme === "dark" ? darkTheme : lightTheme;
@@ -264,6 +266,21 @@ export const OrderDetailsScreen = () => {
       Alert.alert("Error", e?.response?.data?.message || "Failed to cancel order");
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!order) return;
+    try {
+      setDeleting(true);
+      await orderAPI.delete(order.id);
+      setDeleteVisible(false);
+      navigation.navigate("Orders");
+    } catch (e: any) {
+      console.error("Delete failed:", e);
+      Alert.alert("ত্রুটি", e?.response?.data?.message || "অর্ডার মুছে ফেলা যায়নি");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -765,7 +782,7 @@ export const OrderDetailsScreen = () => {
 
     <View style={{ marginHorizontal: 16, gap: 10, marginTop: 20 }}>
       <Pressable
-        onPress={() => handleDelete(order.id)}
+        onPress={() => setDeleteVisible(true)}
         style={({ pressed }) => ({
           flexDirection: "row",
           alignItems: "center",
@@ -820,6 +837,44 @@ export const OrderDetailsScreen = () => {
                     <ActivityIndicator color="#fff" />
                   ) : (
                     <Text style={{ fontWeight: "700", color: "#fff" }}>Yes, Cancel</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+        <Modal
+          visible={deleteVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => !deleting && setDeleteVisible(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 20 }} pointerEvents={deleting ? "none" : "auto"}>
+            <View style={{ width: "100%", maxWidth: 380, backgroundColor: theme.surface, borderRadius: 20, padding: 22, elevation: 10 }}>
+              <Text style={{ fontSize: 20, fontWeight: "700", marginBottom: 12, color: theme.text }}>অর্ডার মুছুন</Text>
+
+              <Text style={{ fontSize: 16, color: theme.text2, lineHeight: 24 }}>
+                "{order?.customerName}" এই বাতিল করা অর্ডারটি স্থায়ীভাবে মুছে ফেলতে চান? এটি পূর্বাবস্থায় ফিরানো যাবে না।
+              </Text>
+
+              <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 24, gap: 12 }}>
+                <TouchableOpacity
+                  style={{ paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12, minWidth: 100, alignItems: "center", backgroundColor: theme.surface2 }}
+                  onPress={() => setDeleteVisible(false)}
+                  disabled={deleting}
+                >
+                  <Text style={{ fontWeight: "600", color: theme.text }}>না</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{ paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12, minWidth: 100, alignItems: "center", backgroundColor: "#e53935" }}
+                  onPress={confirmDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={{ fontWeight: "700", color: "#fff" }}>হ্যাঁ, মুছুন</Text>
                   )}
                 </TouchableOpacity>
               </View>

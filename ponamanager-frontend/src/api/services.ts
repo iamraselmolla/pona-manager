@@ -100,7 +100,7 @@ export const orderAPI = {
   update: (id: string, data: Partial<Order>) =>
     apiClient.put<ApiResponse<Order>>(`/orders/${id}`, data),
 
-  cancel: (id: string) =>
+  cancel: (id: string) => console.log("Canceling order with id:", id) ||
     apiClient.patch<ApiResponse<Order>>(`/orders/${id}/cancel`),
 };
 
