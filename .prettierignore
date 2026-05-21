@@ -1,0 +1,15 @@
+node_modules
+dist
+build
+.expo
+.turbo
+*.lock
+*.log
+coverage
+.next
+.vercel
+/.pnp
+/.pnp.js
+yarn-error.log
+pnpm-lock.yaml
+**/node_modules

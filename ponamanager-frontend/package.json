@@ -8,7 +8,9 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "build:android": "eas build --platform android",
-    "build:ios": "eas build --platform ios"
+    "build:ios": "eas build --platform ios",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css,scss}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css,scss}\""
   },
   "dependencies": {
     "@expo/metro-runtime": "~3.2.3",
@@ -45,6 +47,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
+    "prettier": "^3.8.3",
     "typescript": "^5.3.3"
   }
 }

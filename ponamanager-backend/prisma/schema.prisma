@@ -6,7 +6,16 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+enum CompanyBatchStatus {
+  pending    // payment made, waiting for pona
+  delivered  // pona received, mir entry done
+}
 
+enum PonaType {
+  Golda
+  Bagda
+  Vannamei
+}
 model User {
   id        String   @id @default(cuid())
   name      String
@@ -86,6 +95,8 @@ model Batch {
   batchOrders BatchOrder[]
   expenses    BatchExpense[]
   orders      Order[]
+    companyOrders  CompanyOrder[]
+
 }
 
 model BatchOrder {
@@ -106,6 +117,12 @@ model BatchOrder {
 
   batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
   order Order @relation(fields: [orderId], references: [id])
+  companyMir     Float?
+//   ourMir         Float?
+//   mirDiff        Float?
+//   totalPoly      Float?
+//   totalFish      Float?    // ourMir × totalPoly
+//   ponaType       String?
 }
 
 model BatchExpense {
@@ -174,4 +191,41 @@ model CustomerNote {
   createdAt  DateTime @default(now())
 
   customer Customer @relation(fields: [customerId], references: [id])
+}
+
+
+model CompanyOrder {
+  id              String              @id @default(cuid())
+  
+  // Payment info (created when we pay company)
+  ponaType        String              // Golda, Bagda, Vannamei
+  paymentAmount   Float               // how much we paid
+  ratePerPL       Float               // price per PL (e.g. 4tk)
+  expectedPL      Float               // paymentAmount / ratePerPL
+  expectedDate    DateTime            // expected delivery date
+  status          String              @default("pending") // pending | delivered
+  notes           String?
+
+  // Filled after pona arrives
+  mirValue        Float?              // company mir (e.g. 1150)
+  totalPoly       Float?              // how many poly bags received
+  totalPL         Float?              // mirValue × totalPoly
+  actualAmount    Float?              // totalPL × ratePerPL
+  paidToCompany   Float?              // what we actually paid on delivery
+  dueToCompany    Float?              // actualAmount - paymentAmount - paidToCompany
+  advanceToUs     Float?              // if we overpaid
+
+  // Carry forward from previous CompanyOrder
+  prevDue         Float               @default(0)
+  prevAdvance     Float               @default(0)
+  netDue          Float               @default(0)
+  netAdvance      Float               @default(0)
+
+  // Link to delivery batch
+  batchId         String?             // set when pona is assigned to a batch
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  batch           Batch?              @relation(fields: [batchId], references: [id])
 }

@@ -29,6 +29,9 @@ import { ProfileScreen } from '../screens/settings/ProfileScreen';
 import { AppSettingsScreen } from '../screens/settings/AppSettingsScreen';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
+import { CompanyOrderListScreen } from '../screens/company/CompanyOrderListScreen';
+import { CreateCompanyOrderScreen } from '../screens/company/Createcompanyorderscreen ';
+import { CompanyOrderDetailScreen } from '../screens/company/Companyorderdetailscreen ';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -74,6 +77,9 @@ export const RootNavigator = () => {
           <Stack.Screen name="NotificationScreen" component={NotificationScreen} options={{ title: 'নোটিফিকেশন' }} />
           <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'প্রোফাইল' }} />
           <Stack.Screen name="AppSettings" component={AppSettingsScreen} options={{ title: 'সেটিংস' }} />
+          <Stack.Screen name="CompanyOrderList"   component={CompanyOrderListScreen}   />
+<Stack.Screen name="CreateCompanyOrder" component={CreateCompanyOrderScreen} />
+<Stack.Screen name="CompanyOrderDetail" component={CompanyOrderDetailScreen} />
         </>
       )}
     </Stack.Navigator>

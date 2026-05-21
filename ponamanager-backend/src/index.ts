@@ -11,6 +11,7 @@ import { authRoutes } from './routes/auth';
 import { customerRoutes } from './routes/customer';
 import { orderRoutes } from './routes/order';
 import { batchRoutes } from './routes/batch';
+import { companyOrderRouter } from './routes/companyOrder';
 
 import {
   expenseRoutes,
@@ -131,6 +132,9 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
 app.use('/api/reports', reportRoutes);
+
+ app.use("/api/company-orders", companyOrderRouter);
+
 
 /**
  * Health Check
