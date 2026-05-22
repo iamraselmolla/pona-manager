@@ -1,8 +1,8 @@
 // src/routes/batch.ts
-import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
-import { authMiddleware } from "../middleware/auth";
-import dayjs from "dayjs";
+import { Router } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { authMiddleware } from '../middleware/auth';
+import dayjs from 'dayjs';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -30,27 +30,23 @@ async function recomputeBatch(batchId: string) {
     const qty = bo.order.plQuantity;
     const pona = bo.order.ponaType;
 
-    if (pona === "Golda PL") {
+    if (pona === 'Golda PL') {
       totalOrderedGolda += qty;
-      if (bo.deliveryStatus === "delivered")
-        totalDeliveredGolda += bo.deliveredQuantity || 0;
+      if (bo.deliveryStatus === 'delivered') totalDeliveredGolda += bo.deliveredQuantity || 0;
     }
-    if (pona === "Bagda PL") {
+    if (pona === 'Bagda PL') {
       totalOrderedBagda += qty;
-      if (bo.deliveryStatus === "delivered")
-        totalDeliveredBagda += bo.deliveredQuantity || 0;
+      if (bo.deliveryStatus === 'delivered') totalDeliveredBagda += bo.deliveredQuantity || 0;
     }
-    if (pona === "Vannamei PL") {
+    if (pona === 'Vannamei PL') {
       totalOrderedVannamei += qty;
-      if (bo.deliveryStatus === "delivered")
-        totalDeliveredVannamei += bo.deliveredQuantity || 0;
+      if (bo.deliveryStatus === 'delivered') totalDeliveredVannamei += bo.deliveredQuantity || 0;
     }
 
-    if (bo.deliveryStatus === "pending") {
+    if (bo.deliveryStatus === 'pending') {
       pendingDeliveries++;
     } else {
-      totalCollected +=
-        (bo.order.advanceAmount || 0) + (bo.customerPayment || 0);
+      totalCollected += (bo.order.advanceAmount || 0) + (bo.customerPayment || 0);
       const due = bo.dueAmount || 0;
       totalDue += due;
       if (due > 0) duePendingCount++;
@@ -62,10 +58,10 @@ async function recomputeBatch(batchId: string) {
   const totalProfit = totalCollected - totalExpenses;
 
   let status: string;
-  if (pendingDeliveries === batchOrders.length) status = "pending";
-  else if (pendingDeliveries > 0) status = "in_progress";
-  else if (totalDue > 0) status = "has_due";
-  else status = "completed";
+  if (pendingDeliveries === batchOrders.length) status = 'pending';
+  else if (pendingDeliveries > 0) status = 'in_progress';
+  else if (totalDue > 0) status = 'has_due';
+  else status = 'completed';
 
   return prisma.batch.update({
     where: { id: batchId },
@@ -89,9 +85,9 @@ async function recomputeBatch(batchId: string) {
 }
 
 // ── GET /batches ─────────────────────────────────────────
-router.get("/", async (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const { month, status, page = "1", limit = "50" } = req.query as any;
+    const { month, status, page = '1', limit = '50' } = req.query as any;
     const skip = (Number(page) - 1) * Number(limit);
     const where: any = {};
     if (status) where.status = status;
@@ -102,7 +98,7 @@ router.get("/", async (req, res) => {
         where,
         skip,
         take: Number(limit),
-        orderBy: { batchDate: "desc" },
+        orderBy: { batchDate: 'desc' },
         include: { batchOrders: { include: { order: true } }, expenses: true },
       }),
       prisma.batch.count({ where }),
@@ -119,45 +115,30 @@ router.get("/", async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch batches" });
+    res.status(500).json({ success: false, message: 'Failed to fetch batches' });
   }
 });
 
 // ── GET /batches/monthly/:month ──────────────────────────
-router.get("/monthly/:month", async (req, res) => {
+router.get('/monthly/:month', async (req, res) => {
   try {
     const batches = await prisma.batch.findMany({
       where: { batchDate: { startsWith: req.params.month } },
       include: { batchOrders: { include: { order: true } }, expenses: true },
-      orderBy: { batchDate: "asc" },
+      orderBy: { batchDate: 'asc' },
     });
 
     const summary = {
       month: req.params.month,
       totalBatches: batches.length,
-      completedBatches: batches.filter(
-        (b) => b.status === "completed" || b.status === "has_due",
-      ).length,
+      completedBatches: batches.filter((b) => b.status === 'completed' || b.status === 'has_due')
+        .length,
       totalGoldaOrdered: batches.reduce((s, b) => s + b.totalOrderedGolda, 0),
-      totalGoldaDelivered: batches.reduce(
-        (s, b) => s + b.totalDeliveredGolda,
-        0,
-      ),
+      totalGoldaDelivered: batches.reduce((s, b) => s + b.totalDeliveredGolda, 0),
       totalBagdaOrdered: batches.reduce((s, b) => s + b.totalOrderedBagda, 0),
-      totalBagdaDelivered: batches.reduce(
-        (s, b) => s + b.totalDeliveredBagda,
-        0,
-      ),
-      totalVannameiOrdered: batches.reduce(
-        (s, b) => s + b.totalOrderedVannamei,
-        0,
-      ),
-      totalVannameiDelivered: batches.reduce(
-        (s, b) => s + b.totalDeliveredVannamei,
-        0,
-      ),
+      totalBagdaDelivered: batches.reduce((s, b) => s + b.totalDeliveredBagda, 0),
+      totalVannameiOrdered: batches.reduce((s, b) => s + b.totalOrderedVannamei, 0),
+      totalVannameiDelivered: batches.reduce((s, b) => s + b.totalDeliveredVannamei, 0),
       totalCollected: batches.reduce((s, b) => s + b.totalCollected, 0),
       totalDue: batches.reduce((s, b) => s + b.totalDue, 0),
       totalExpenses: batches.reduce((s, b) => s + b.totalExpenses, 0),
@@ -166,42 +147,37 @@ router.get("/monthly/:month", async (req, res) => {
     };
     res.json({ success: true, data: summary });
   } catch (err) {
-    res.status(500).json({ success: false, message: "Failed" });
+    res.status(500).json({ success: false, message: 'Failed' });
   }
 });
 
 // ── GET /batches/:id ─────────────────────────────────────
-router.get("/:id", async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const batch = await prisma.batch.findUnique({
       where: { id: req.params.id },
       include: { batchOrders: { include: { order: true } }, expenses: true },
     });
-    if (!batch)
-      return res
-        .status(404)
-        .json({ success: false, message: "Batch not found" });
+    if (!batch) return res.status(404).json({ success: false, message: 'Batch not found' });
     res.json({ success: true, data: batch });
   } catch {
-    res.status(500).json({ success: false, message: "Failed" });
+    res.status(500).json({ success: false, message: 'Failed' });
   }
 });
 
 // ── POST /batches — create batch ─────────────────────────
-router.post("/", async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { batchDate, orderIds } = req.body as {
       batchDate: string;
       orderIds: string[];
     };
     if (!orderIds?.length)
-      return res
-        .status(400)
-        .json({ success: false, message: "No orders selected" });
+      return res.status(400).json({ success: false, message: 'No orders selected' });
 
     // Generate batch number
     const count = await prisma.batch.count();
-    const batchNumber = `BATCH-${dayjs(batchDate).format("YYYY-MM")}-${String(count + 1).padStart(3, "0")}`;
+    const batchNumber = `BATCH-${dayjs(batchDate).format('YYYY-MM')}-${String(count + 1).padStart(3, '0')}`;
 
     // Create batch + batchOrders in transaction
     const batch = await prisma.$transaction(async (tx) => {
@@ -209,7 +185,7 @@ router.post("/", async (req, res) => {
         data: {
           batchNumber,
           batchDate,
-          status: "pending",
+          status: 'pending',
           pendingDeliveries: orderIds.length,
         },
       });
@@ -219,14 +195,14 @@ router.post("/", async (req, res) => {
         data: orderIds.map((orderId) => ({
           batchId: newBatch.id,
           orderId,
-          deliveryStatus: "pending",
+          deliveryStatus: 'pending',
         })),
       });
 
       // Mark orders as in_batch
       await tx.order.updateMany({
         where: { id: { in: orderIds } },
-        data: { status: "in_batch", batchId: newBatch.id },
+        data: { status: 'in_batch', batchId: newBatch.id },
       });
 
       return newBatch;
@@ -236,12 +212,12 @@ router.post("/", async (req, res) => {
     res.status(201).json({ success: true, data: result });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false, message: "Failed to create batch" });
+    res.status(500).json({ success: false, message: 'Failed to create batch' });
   }
 });
 
 // ── PATCH /batches/:id/add-orders ────────────────────────
-router.patch("/:id/add-orders", async (req, res) => {
+router.patch('/:id/add-orders', async (req, res) => {
   try {
     const { orderIds } = req.body as { orderIds: string[] };
     await prisma.$transaction(async (tx) => {
@@ -249,47 +225,46 @@ router.patch("/:id/add-orders", async (req, res) => {
         data: orderIds.map((orderId) => ({
           batchId: req.params.id,
           orderId,
-          deliveryStatus: "pending",
+          deliveryStatus: 'pending',
         })),
       });
       await tx.order.updateMany({
         where: { id: { in: orderIds } },
-        data: { status: "in_batch", batchId: req.params.id },
+        data: { status: 'in_batch', batchId: req.params.id },
       });
     });
     const result = await recomputeBatch(req.params.id);
     res.json({ success: true, data: result });
   } catch {
-    res.status(500).json({ success: false, message: "Failed to add orders" });
+    res.status(500).json({ success: false, message: 'Failed to add orders' });
   }
 });
 
 // ── DELETE /batches/:id/orders/:batchOrderId ─────────────
-router.delete("/:id/orders/:batchOrderId", async (req, res) => {
+router.delete('/:id/orders/:batchOrderId', async (req, res) => {
   try {
     const bo = await prisma.batchOrder.findUnique({
       where: { id: req.params.batchOrderId },
     });
-    console.log(bo, "bo");
-    if (!bo)
-      return res.status(404).json({ success: false, message: "Not found" });
+    console.log(bo, 'bo');
+    if (!bo) return res.status(404).json({ success: false, message: 'Not found' });
 
     await prisma.$transaction(async (tx) => {
       await tx.batchOrder.delete({ where: { id: req.params.batchOrderId } });
       await tx.order.update({
         where: { id: bo.orderId },
-        data: { status: "pending", batchId: null },
+        data: { status: 'pending', batchId: null },
       });
     });
     await recomputeBatch(req.params.id);
     res.json({ success: true });
   } catch {
-    res.status(500).json({ success: false, message: "Failed to remove order" });
+    res.status(500).json({ success: false, message: 'Failed to remove order' });
   }
 });
 
 // ── PATCH /batches/:id/orders/:batchOrderId/deliver ──────
-router.patch("/:id/orders/:batchOrderId/deliver", async (req, res) => {
+router.patch('/:id/orders/:batchOrderId/deliver', async (req, res) => {
   try {
     const {
       deliveredQuantity,
@@ -298,6 +273,8 @@ router.patch("/:id/orders/:batchOrderId/deliver", async (req, res) => {
       dueAmount,
       duePaymentDate,
       notes,
+      isPartial,
+      remainingQuantity,
     } = req.body;
 
     // Get order advance
@@ -305,10 +282,7 @@ router.patch("/:id/orders/:batchOrderId/deliver", async (req, res) => {
       where: { id: req.params.batchOrderId },
       include: { order: true },
     });
-    if (!bo)
-      return res
-        .status(404)
-        .json({ success: false, message: "BatchOrder not found" });
+    if (!bo) return res.status(404).json({ success: false, message: 'BatchOrder not found' });
 
     const finalAmount = deliveredQuantity * deliveryRate;
 
@@ -317,7 +291,7 @@ router.patch("/:id/orders/:batchOrderId/deliver", async (req, res) => {
       await tx.batchOrder.update({
         where: { id: req.params.batchOrderId },
         data: {
-          deliveryStatus: "delivered",
+          deliveryStatus: 'delivered',
           deliveredQuantity,
           deliveryRate,
           finalAmount,
@@ -332,8 +306,38 @@ router.patch("/:id/orders/:batchOrderId/deliver", async (req, res) => {
       // Mark order delivered
       await tx.order.update({
         where: { id: bo.orderId },
-        data: { status: "delivered", dueAmount: dueAmount || 0 },
+        data: { status: 'delivered', dueAmount: dueAmount || 0 },
       });
+
+      // If partial delivery requested, create a new pending order for the remaining qty
+      if (isPartial && remainingQuantity && remainingQuantity > 0) {
+        const orig = bo.order;
+        const newOrder = await tx.order.create({
+          data: {
+            customerId: orig.customerId || undefined,
+            customerName: orig.customerName,
+            customerMobile: orig.customerMobile,
+            customerAddress: orig.customerAddress,
+            ponaType: orig.ponaType,
+            plQuantity: remainingQuantity,
+            unitRate: orig.unitRate,
+            totalPrice: remainingQuantity * orig.unitRate,
+            advanceAmount: 0,
+            dueAmount: 0,
+            deliveryDate: orig.deliveryDate,
+            status: 'pending',
+            notes: orig.notes,
+          },
+        });
+
+        // Update customer running orders/stats
+        if (orig.customerId) {
+          await tx.customer.update({
+            where: { id: orig.customerId },
+            data: { hasRunningOrder: true, totalOrders: { increment: 1 } },
+          });
+        }
+      }
 
       // Update customer stats
       if (bo.order.customerId) {
@@ -350,16 +354,13 @@ router.patch("/:id/orders/:batchOrderId/deliver", async (req, res) => {
       }
 
       // Create payment record
-      if (
-        (customerPayment || 0) + (bo.order.advanceAmount || 0) > 0 &&
-        bo.order.customerId
-      ) {
+      if ((customerPayment || 0) + (bo.order.advanceAmount || 0) > 0 && bo.order.customerId) {
         await tx.payment.create({
           data: {
             customerId: bo.order.customerId,
             orderId: bo.orderId,
             amount: (customerPayment || 0) + (bo.order.advanceAmount || 0),
-            date: new Date().toISOString().split("T")[0],
+            date: new Date().toISOString().split('T')[0],
             notes: `Batch delivery: ${req.params.id}`,
           },
         });
@@ -367,20 +368,16 @@ router.patch("/:id/orders/:batchOrderId/deliver", async (req, res) => {
     });
 
     const updatedBatch = await recomputeBatch(req.params.id);
-    const updatedBO = updatedBatch.batchOrders.find(
-      (b) => b.id === req.params.batchOrderId,
-    );
+    const updatedBO = updatedBatch.batchOrders.find((b) => b.id === req.params.batchOrderId);
     res.json({ success: true, data: updatedBO });
   } catch (err) {
     console.error(err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to record delivery" });
+    res.status(500).json({ success: false, message: 'Failed to record delivery' });
   }
 });
 
 // ── PATCH /batches/:id/complete ──────────────────────────
-router.patch("/:id/complete", async (req, res) => {
+router.patch('/:id/complete', async (req, res) => {
   try {
     const { expenses } = req.body as {
       expenses: { label: string; amount: number }[];
@@ -388,7 +385,7 @@ router.patch("/:id/complete", async (req, res) => {
 
     // Validate all delivered
     const pending = await prisma.batchOrder.count({
-      where: { batchId: req.params.id, deliveryStatus: "pending" },
+      where: { batchId: req.params.id, deliveryStatus: 'pending' },
     });
     if (pending > 0)
       return res.status(400).json({
@@ -412,7 +409,7 @@ router.patch("/:id/complete", async (req, res) => {
     const result = await recomputeBatch(req.params.id);
 
     // Mark completedAt if all done
-    const finalStatus = result.totalDue > 0 ? "has_due" : "completed";
+    const finalStatus = result.totalDue > 0 ? 'has_due' : 'completed';
     const updated = await prisma.batch.update({
       where: { id: req.params.id },
       data: { status: finalStatus, completedAt: new Date() },
@@ -422,9 +419,7 @@ router.patch("/:id/complete", async (req, res) => {
     res.json({ success: true, data: updated });
   } catch (err) {
     console.error(err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to complete batch" });
+    res.status(500).json({ success: false, message: 'Failed to complete batch' });
   }
 });
 
@@ -436,7 +431,7 @@ router.delete('/:id', async (req, res) => {
       include: { batchOrders: true },
     });
     if (!batch) return res.status(404).json({ success: false, message: 'Batch not found' });
- 
+
     // Cannot delete completed batch
     if (batch.status === 'completed') {
       return res.status(400).json({
@@ -444,7 +439,7 @@ router.delete('/:id', async (req, res) => {
         message: 'সম্পন্ন ব্যাচ মুছে ফেলা যাবে না',
       });
     }
- 
+
     await prisma.$transaction(async (tx) => {
       // Release all orders back to pending
       const orderIds = batch.batchOrders.map((bo) => bo.orderId);
@@ -457,7 +452,7 @@ router.delete('/:id', async (req, res) => {
       // Delete batch (cascade deletes batchOrders + batchExpenses)
       await tx.batch.delete({ where: { id: req.params.id } });
     });
- 
+
     res.json({ success: true, message: 'Batch deleted. All orders released.' });
   } catch (err) {
     console.error(err);

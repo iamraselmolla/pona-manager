@@ -1,69 +1,69 @@
-// src/api/batchServices.ts
-import apiClient from "./client";
-import { Batch, BatchOrder, ApiResponse, PaginatedResponse } from "../types";
+// src/api/batchServices.ts — FULL FILE
+import apiClient from './client';
 
 export const batchAPI = {
-  // Get all batches (paginated, filter by month)
-  getAll: (params?: {
-    month?: string;
-    status?: string;
-    page?: number;
-    limit?: number;
-  }) =>
-    apiClient.get<ApiResponse<PaginatedResponse<Batch>>>("/batches", {
-      params,
-    }),
+  // ── Batch CRUD ──────────────────────────────────────────────────────────────
+  getAll: (params?: { month?: string; status?: string; limit?: number }) =>
+    apiClient.get('/batches', { params }),
 
-  // Get single batch with all batchOrders populated
-  getById: (id: string) => apiClient.get<ApiResponse<Batch>>(`/batches/${id}`),
+  getById: (id: string) => apiClient.get(`/batches/${id}`),
 
-  // Create new batch with selected order IDs
-  create: (data: { batchDate: string; orderIds: string[] }) =>
-    apiClient.post<ApiResponse<Batch>>("/batches", data),
+  create: (data: { batchDate: string; orderIds: string[] }) => apiClient.post('/batches', data),
 
-  // Add more orders to existing pending batch
+  // Add orders to existing batch
   addOrders: (batchId: string, orderIds: string[]) =>
-    apiClient.patch<ApiResponse<Batch>>(`/batches/${batchId}/add-orders`, {
-      orderIds,
-    }),
+    apiClient.patch(`/batches/${batchId}/add-orders`, { orderIds }),
 
-  // Remove order from pending batch
+  update: (id: string, data: any) => apiClient.patch(`/batches/${id}`, data),
+
+  delete: (id: string) => apiClient.delete(`/batches/${id}`),
+
+  // ── Batch order management ───────────────────────────────────────────────────
+  // Add order to existing batch
+  addOrderToBatch: (batchId: string, orderId: string) =>
+    apiClient.post(`/batches/${batchId}/orders`, { orderId }),
+
+  // Remove order from batch (unbatch)
   removeOrder: (batchId: string, batchOrderId: string) =>
-    apiClient.delete<ApiResponse<null>>(
-      `/batches/${batchId}/orders/${batchOrderId}`,
-    ),
+    apiClient.delete(`/batches/${batchId}/orders/${batchOrderId}`),
 
-  // Record delivery for a single batchOrder (opens modal)
+  // ── Delivery ─────────────────────────────────────────────────────────────────
   recordDelivery: (
     batchId: string,
     batchOrderId: string,
     data: {
+      // Quantity
       deliveredQuantity: number;
+      // Mir data (new)
+      companyMir?: number;
+      ourMir?: number;
+      totalPoly?: number;
+      mirDiff?: number;
+      totalFish?: number;
+      deliveredPL?: number;
+      // Payment
       deliveryRate: number;
+      discount?: number;
       customerPayment: number;
       dueAmount: number;
       duePaymentDate?: string;
+      finalAmount?: number;
+      // Partial
+      isPartial: boolean;
+      remainingQuantity: number;
       notes?: string;
     },
-  ) =>
-    apiClient.patch<ApiResponse<BatchOrder>>(
-      `/batches/${batchId}/orders/${batchOrderId}/deliver`,
-      data,
-    ),
+  ) => apiClient.patch(`/batches/${batchId}/orders/${batchOrderId}/deliver`, data),
 
-  // Complete batch - requires expenses
-  completeBatch: (
+  // ── Complete batch ────────────────────────────────────────────────────────────
+  complete: (
     batchId: string,
-    expenses: { label: string; amount: number }[],
-  ) =>
-    apiClient.patch<ApiResponse<Batch>>(`/batches/${batchId}/complete`, {
-      expenses,
-    }),
+    data: {
+      expenses: Array<{ label: string; amount: number }>;
+      notes?: string;
+    },
+  ) => apiClient.patch(`/batches/${batchId}/complete`, data),
 
-  // Monthly batch report
-  getMonthlyReport: (month: string) =>
-    apiClient.get<ApiResponse<any>>(`/batches/monthly/${month}`),
-
-   deleteBatch: (batchId: string) =>
-    apiClient.delete<ApiResponse<null>>(`/batches/${batchId}`),
+  // ── Collection ────────────────────────────────────────────────────────────────
+  getCollection: (batchId: string) => apiClient.get(`/batches/${batchId}/collection`),
 };

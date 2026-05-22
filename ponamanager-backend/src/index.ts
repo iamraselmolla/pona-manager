@@ -23,6 +23,7 @@ import {
 
 import { requestLogger } from './middleware/requestLogger';
 import { errorHandler } from './middleware/errorHandler';
+import { collectionRouter } from './routes/collection';
 
 dotenv.config();
 
@@ -48,7 +49,7 @@ app.use(
     origin: process.env.CORS_ORIGIN || '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
-  })
+  }),
 );
 
 /**
@@ -59,9 +60,7 @@ app.use(
 /**
  * Logging
  */
-app.use(
-  morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev')
-);
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 app.use(requestLogger);
 
@@ -71,14 +70,14 @@ app.use(requestLogger);
 app.use(
   express.json({
     limit: '10mb',
-  })
+  }),
 );
 
 app.use(
   express.urlencoded({
     extended: true,
     limit: '10mb',
-  })
+  }),
 );
 
 /**
@@ -133,8 +132,9 @@ app.use('/api/dashboard', dashboardRoutes);
 
 app.use('/api/reports', reportRoutes);
 
- app.use("/api/company-orders", companyOrderRouter);
+app.use('/api/company-orders', companyOrderRouter);
 
+app.use('/api/collection', collectionRouter);
 
 /**
  * Health Check

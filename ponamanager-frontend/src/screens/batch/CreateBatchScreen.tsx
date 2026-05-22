@@ -1,11 +1,17 @@
 // src/screens/batch/CreateBatchScreen.tsx
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Alert, TextInput,
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { orderAPI } from '../../api/services';
 import { batchAPI } from '../../api/batchServices';
 import { Order } from '../../types';
@@ -26,7 +32,11 @@ const OrderSelectCard = ({
   const typeColor = getPonaTypeColor(order.ponaType);
   return (
     <TouchableOpacity
-      style={[styles.orderCard, selected && styles.orderCardSelected, { borderLeftColor: typeColor }]}
+      style={[
+        styles.orderCard,
+        selected && styles.orderCardSelected,
+        { borderLeftColor: typeColor },
+      ]}
       onPress={onToggle}
       activeOpacity={0.8}
     >
@@ -58,6 +68,8 @@ const OrderSelectCard = ({
 
 export const CreateBatchScreen = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const { batchId } = route.params || {};
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -88,9 +100,10 @@ export const CreateBatchScreen = () => {
     }
   };
 
-  const filtered = orders.filter((o) =>
-    o.customerName.toLowerCase().includes(search.toLowerCase()) ||
-    o.customerMobile.includes(search)
+  const filtered = orders.filter(
+    (o) =>
+      o.customerName.toLowerCase().includes(search.toLowerCase()) ||
+      o.customerMobile.includes(search),
   );
 
   const handleCreate = async () => {
@@ -100,9 +113,15 @@ export const CreateBatchScreen = () => {
     }
     setSaving(true);
     try {
-      const res = await batchAPI.create({ batchDate, orderIds: Array.from(selectedIds) });
-     showAlert('সাফল্য', 'ব্যাচ সফলভাবে তৈরি হয়েছে');
-      navigation.navigate("Batches");
+      if (batchId) {
+        await batchAPI.addOrders(batchId, Array.from(selectedIds));
+        showAlert('সাফল্য', 'অর্ডারগুলো ব্যাচে যোগ করা হয়েছে');
+        navigation.goBack();
+      } else {
+        await batchAPI.create({ batchDate, orderIds: Array.from(selectedIds) });
+        showAlert('সাফল্য', 'ব্যাচ সফলভাবে তৈরি হয়েছে');
+        navigation.navigate('Batches');
+      }
     } catch (err: any) {
       Alert.alert('ত্রুটি', err.response?.data?.message || 'ব্যাচ তৈরি ব্যর্থ হয়েছে');
     } finally {
@@ -150,7 +169,11 @@ export const CreateBatchScreen = () => {
       <View style={styles.selectAllRow}>
         <TouchableOpacity style={styles.selectAllBtn} onPress={selectAll}>
           <Ionicons
-            name={selectedIds.size === filtered.length && filtered.length > 0 ? 'checkbox' : 'square-outline'}
+            name={
+              selectedIds.size === filtered.length && filtered.length > 0
+                ? 'checkbox'
+                : 'square-outline'
+            }
             size={20}
             color={COLORS.primary}
           />
@@ -164,7 +187,9 @@ export const CreateBatchScreen = () => {
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
       ) : (
         <FlatList
           data={filtered}
@@ -213,40 +238,75 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   dateRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: COLORS.white, paddingHorizontal: 16, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: COLORS.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
   dateLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
   dateInput: {
-    flex: 1, fontSize: 14, color: COLORS.text,
-    borderWidth: 1, borderColor: COLORS.border, borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 6,
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   searchRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
-  searchInput: { flex: 1, paddingVertical: 10, paddingHorizontal: 8, fontSize: 14, color: COLORS.text },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    fontSize: 14,
+    color: COLORS.text,
+  },
   selectAllRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 8,
-    backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
   selectAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   selectAllText: { fontSize: 13, fontWeight: '600', color: COLORS.primary },
   selectedInfo: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
 
   orderCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: COLORS.white, borderRadius: 12, padding: 12,
-    borderLeftWidth: 4, borderWidth: 1.5, borderColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 12,
+    borderLeftWidth: 4,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     elevation: 1,
   },
   orderCardSelected: { borderColor: COLORS.primary },
   checkbox: {
-    width: 24, height: 24, borderRadius: 6, borderWidth: 2,
-    borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center',
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   checkboxSelected: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   orderCustomer: { fontSize: 14, fontWeight: '700', color: COLORS.text },
@@ -263,16 +323,30 @@ const styles = StyleSheet.create({
   emptyText: { color: COLORS.textSecondary, fontSize: 14 },
 
   bottomBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: COLORS.white, paddingHorizontal: 16, paddingVertical: 14,
-    borderTopWidth: 1, borderTopColor: COLORS.border, elevation: 10,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    elevation: 10,
   },
   bottomCount: { fontSize: 13, fontWeight: '700', color: COLORS.text },
   bottomPL: { fontSize: 12, color: COLORS.textSecondary },
   createBtn: {
-    flexDirection: 'row', gap: 6, alignItems: 'center',
-    backgroundColor: COLORS.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10,
+    flexDirection: 'row',
+    gap: 6,
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   createBtnText: { color: COLORS.white, fontWeight: '800', fontSize: 14 },
 });

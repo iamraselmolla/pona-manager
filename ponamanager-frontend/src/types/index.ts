@@ -51,16 +51,29 @@ export interface BatchOrder {
   id: string;
   batchId: string;
   orderId: string;
-  order: Order;
-  deliveryStatus: 'pending' | 'delivered';
+  deliveryStatus: 'pending' | 'partial' | 'delivered';
+
+  // Delivery data
   deliveredQuantity?: number;
   deliveryRate?: number;
-  finalAmount?: number;
   customerPayment?: number;
   dueAmount?: number;
   duePaymentDate?: string;
   notes?: string;
-  deliveredAt?: string;
+
+  // ── NEW: Mir fields ──
+  companyMir?: number; // company's mir per poly
+  ourMir?: number; // our measured mir per poly
+  mirDiff?: number; // companyMir - ourMir (per poly)
+  totalPoly?: number; // number of poly bags delivered
+  totalFish?: number; // ourMir × totalPoly = actual fish count
+  deliveredPL?: number; // same as totalPoly in most cases
+  discount?: number; // discount given to customer
+  finalAmount?: number; // (totalFish × rate) - discount
+
+  order: Order;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface BatchExpense {
@@ -227,3 +240,36 @@ export type RootStackParamList = {
   Profile: undefined;
   AppSettings: undefined;
 };
+
+export interface CompanyOrder {
+  id: string;
+  ponaType: string;
+  paymentAmount: number;
+  ratePerPL: number;
+  expectedPL: number;
+  expectedDate: string;
+  status: 'pending' | 'delivered';
+  notes?: string;
+
+  // Filled after pona received
+  mirValue?: number;
+  totalPoly?: number;
+  totalPL?: number;
+  actualAmount?: number;
+  paidToCompany?: number;
+  dueToCompany?: number;
+  advanceToUs?: number;
+
+  // Carry forward
+  prevDue: number;
+  prevAdvance: number;
+  netDue: number;
+  netAdvance: number;
+
+  // Link
+  batchId?: string;
+  batch?: { batchNumber: string; status: string; batchDate: string };
+
+  createdAt: string;
+  updatedAt: string;
+}

@@ -2,14 +2,7 @@
 // Global modal — mount once in your root (App.tsx / RootLayout).
 // Use anywhere via: import { showModal } from "../components/AppModal"
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-} from "react";
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -19,16 +12,16 @@ import {
   Animated,
   useColorScheme,
   Platform,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
-type ModalType = "error" | "success" | "warning" | "info";
+type ModalType = 'error' | 'success' | 'warning' | 'info';
 
 interface ModalAction {
   label: string;
   onPress?: () => void;
-  style?: "default" | "cancel" | "destructive";
+  style?: 'default' | 'cancel' | 'destructive';
 }
 
 interface ModalOptions {
@@ -54,70 +47,86 @@ export const showModal = (opts: ModalOptions) => {
     _showModal(opts);
   } else {
     // Fallback if called before provider mounts
-    console.warn("[AppModal] showModal called before provider mounted");
+    console.warn('[AppModal] showModal called before provider mounted');
   }
 };
 
 // Convenience shorthands
-export const showError = (message: string, title = "ত্রুটি") =>
-  showModal({ type: "error", title, message });
+export const showError = (message: string, title = 'ত্রুটি') =>
+  showModal({ type: 'error', title, message });
 
-export const showSuccess = (message: string, title = "সফল!") =>
-  showModal({ type: "success", title, message });
+export const showSuccess = (message: string, title = 'সফল!') =>
+  showModal({ type: 'success', title, message });
 
-export const showWarning = (message: string, title = "সতর্কতা") =>
-  showModal({ type: "warning", title, message });
+export const showWarning = (message: string, title = 'সতর্কতা') =>
+  showModal({ type: 'warning', title, message });
 
-export const showInfo = (message: string, title = "তথ্য") =>
-  showModal({ type: "info", title, message });
+export const showInfo = (message: string, title = 'তথ্য') =>
+  showModal({ type: 'info', title, message });
+
+export const showConfirm = (
+  message: string,
+  onConfirm: () => void,
+  onCancel?: () => void,
+  title = 'নিশ্চিত করুন',
+) =>
+  showModal({
+    type: 'warning',
+    title,
+    message,
+    actions: [
+      { label: 'বাতিল করুন', style: 'cancel', onPress: onCancel },
+      { label: 'হ্যাঁ, নিশ্চিত', style: 'destructive', onPress: onConfirm },
+    ],
+  });
 
 // ─── Palettes ──────────────────────────────────────────────────────────────────
 const LIGHT = {
-  overlay: "rgba(0,0,0,0.45)",
-  card: "#FFFFFF",
-  textPrimary: "#111827",
-  textSecondary: "#6B7280",
-  border: "rgba(0,0,0,0.08)",
-  btnDefault: "#F3F4F6",
-  btnDefaultText: "#374151",
-  btnDestructiveText: "#EF4444",
+  overlay: 'rgba(0,0,0,0.45)',
+  card: '#FFFFFF',
+  textPrimary: '#111827',
+  textSecondary: '#6B7280',
+  border: 'rgba(0,0,0,0.08)',
+  btnDefault: '#F3F4F6',
+  btnDefaultText: '#374151',
+  btnDestructiveText: '#EF4444',
 };
 
 const DARK = {
-  overlay: "rgba(0,0,0,0.65)",
-  card: "#1E2130",
-  textPrimary: "#F0F2FF",
-  textSecondary: "#8A8FA8",
-  border: "rgba(255,255,255,0.08)",
-  btnDefault: "#2A2D3E",
-  btnDefaultText: "#D1D5DB",
-  btnDestructiveText: "#FF6B6B",
+  overlay: 'rgba(0,0,0,0.65)',
+  card: '#1E2130',
+  textPrimary: '#F0F2FF',
+  textSecondary: '#8A8FA8',
+  border: 'rgba(255,255,255,0.08)',
+  btnDefault: '#2A2D3E',
+  btnDefaultText: '#D1D5DB',
+  btnDestructiveText: '#FF6B6B',
 };
 
 const TYPE_CONFIG = {
   error: {
-    icon: "alert-circle" as const,
-    color: "#EF4444",
-    bg: "rgba(239,68,68,0.10)",
-    defaultTitle: "ত্রুটি",
+    icon: 'alert-circle' as const,
+    color: '#EF4444',
+    bg: 'rgba(239,68,68,0.10)',
+    defaultTitle: 'ত্রুটি',
   },
   success: {
-    icon: "checkmark-circle" as const,
-    color: "#10B981",
-    bg: "rgba(16,185,129,0.10)",
-    defaultTitle: "সফল!",
+    icon: 'checkmark-circle' as const,
+    color: '#10B981',
+    bg: 'rgba(16,185,129,0.10)',
+    defaultTitle: 'সফল!',
   },
   warning: {
-    icon: "warning" as const,
-    color: "#F59E0B",
-    bg: "rgba(245,158,11,0.10)",
-    defaultTitle: "সতর্কতা",
+    icon: 'warning' as const,
+    color: '#F59E0B',
+    bg: 'rgba(245,158,11,0.10)',
+    defaultTitle: 'সতর্কতা',
   },
   info: {
-    icon: "information-circle" as const,
-    color: "#3B82F6",
-    bg: "rgba(59,130,246,0.10)",
-    defaultTitle: "তথ্য",
+    icon: 'information-circle' as const,
+    color: '#3B82F6',
+    bg: 'rgba(59,130,246,0.10)',
+    defaultTitle: 'তথ্য',
   },
 };
 
@@ -127,16 +136,14 @@ const AppModalContext = createContext<ShowModalFn>(() => {});
 export const useAppModal = () => useContext(AppModalContext);
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
-export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
-  const isDark = useColorScheme() === "dark";
+export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const isDark = useColorScheme() === 'dark';
   const T = isDark ? DARK : LIGHT;
 
   const [state, setState] = useState<ModalState>({
     visible: false,
-    message: "",
-    type: "error",
+    message: '',
+    type: 'error',
   });
 
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
@@ -161,7 +168,7 @@ export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
   const show: ShowModalFn = useCallback(
     (opts) => {
       if (autoDismissTimer.current) clearTimeout(autoDismissTimer.current);
-      setState({ ...opts, visible: true, type: opts.type ?? "error" });
+      setState({ ...opts, visible: true, type: opts.type ?? 'error' });
       scaleAnim.setValue(0.85);
       opacityAnim.setValue(0);
       Animated.parallel([
@@ -193,12 +200,12 @@ export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [show]);
 
-  const cfg = TYPE_CONFIG[state.type ?? "error"];
+  const cfg = TYPE_CONFIG[state.type ?? 'error'];
   const title = state.title ?? cfg.defaultTitle;
   const actions: ModalAction[] =
     state.actions && state.actions.length > 0
       ? state.actions
-      : [{ label: "ঠিক আছে", style: "cancel" }];
+      : [{ label: 'ঠিক আছে', style: 'cancel' }];
 
   return (
     <AppModalContext.Provider value={show}>
@@ -230,31 +237,22 @@ export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
             <Text style={[styles.title, { color: T.textPrimary }]}>{title}</Text>
 
             {/* Message */}
-            <Text style={[styles.message, { color: T.textSecondary }]}>
-              {state.message}
-            </Text>
+            <Text style={[styles.message, { color: T.textSecondary }]}>{state.message}</Text>
 
             {/* Divider */}
             <View style={[styles.divider, { backgroundColor: T.border }]} />
 
             {/* Actions */}
-            <View
-              style={[
-                styles.actionsRow,
-                actions.length === 1 && styles.actionsRowSingle,
-              ]}
-            >
+            <View style={[styles.actionsRow, actions.length === 1 && styles.actionsRowSingle]}>
               {actions.map((action, i) => {
-                const isDestructive = action.style === "destructive";
-                const isCancel = action.style === "cancel";
+                const isDestructive = action.style === 'destructive';
+                const isCancel = action.style === 'cancel';
                 const isLast = i === actions.length - 1;
 
                 return (
                   <React.Fragment key={i}>
                     {i > 0 && (
-                      <View
-                        style={[styles.actionDividerV, { backgroundColor: T.border }]}
-                      />
+                      <View style={[styles.actionDividerV, { backgroundColor: T.border }]} />
                     )}
                     <TouchableOpacity
                       style={[
@@ -272,12 +270,8 @@ export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
                         style={[
                           styles.actionText,
                           {
-                            color: isDestructive
-                              ? "#fff"
-                              : isCancel
-                              ? T.textSecondary
-                              : cfg.color,
-                            fontWeight: isLast ? "700" : "500",
+                            color: isDestructive ? '#fff' : isCancel ? T.textSecondary : cfg.color,
+                            fontWeight: isLast ? '700' : '500',
                           },
                         ]}
                       >
@@ -299,19 +293,19 @@ export const AppModalProvider: React.FC<{ children: React.ReactNode }> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 28,
   },
   card: {
-    width: "100%",
+    width: '100%',
     maxWidth: 340,
     borderRadius: 20,
     paddingTop: 28,
-    overflow: "hidden",
+    overflow: 'hidden',
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.18,
         shadowRadius: 20,
@@ -323,42 +317,42 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    alignSelf: "center",
-    alignItems: "center",
-    justifyContent: "center",
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 14,
   },
   title: {
     fontSize: 18,
-    fontWeight: "800",
-    textAlign: "center",
+    fontWeight: '800',
+    textAlign: 'center',
     paddingHorizontal: 20,
     marginBottom: 8,
   },
   message: {
     fontSize: 14,
     lineHeight: 22,
-    textAlign: "center",
+    textAlign: 'center',
     paddingHorizontal: 20,
     marginBottom: 24,
   },
-  divider: { height: 1, width: "100%" },
+  divider: { height: 1, width: '100%' },
   actionsRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     minHeight: 52,
   },
   actionsRowSingle: {},
   actionBtn: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 14,
     paddingHorizontal: 10,
   },
   actionBtnFull: { flex: 1 },
-  actionDividerV: { width: 1, alignSelf: "stretch" },
+  actionDividerV: { width: 1, alignSelf: 'stretch' },
   actionText: {
     fontSize: 15,
-    textAlign: "center",
+    textAlign: 'center',
   },
 });
