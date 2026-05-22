@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 router.use(authMiddleware);
 
 // ── Helper: recompute batch totals ───────────────────────
-async function recomputeBatch(batchId: string) {
+export async function recomputeBatch(batchId: string) {
   const batchOrders = await prisma.batchOrder.findMany({
     where: { batchId },
     include: { order: true },
@@ -156,7 +156,11 @@ router.get('/:id', async (req, res) => {
   try {
     const batch = await prisma.batch.findUnique({
       where: { id: req.params.id },
-      include: { batchOrders: { include: { order: true } }, expenses: true },
+      include: {
+        batchOrders: { include: { order: true } },
+        expenses: true,
+        companyOrders: true,
+      },
     });
     if (!batch) return res.status(404).json({ success: false, message: 'Batch not found' });
     res.json({ success: true, data: batch });

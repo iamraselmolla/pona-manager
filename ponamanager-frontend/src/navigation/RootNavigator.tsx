@@ -23,7 +23,10 @@ import { DailyClosingHistoryScreen } from '../screens/closing/DailyClosingHistor
 import { DailyReportScreen } from '../screens/reports/DailyReportScreen';
 import { MonthlyReportScreen } from '../screens/reports/MonthlyReportScreen';
 import { CustomerDueReportScreen } from '../screens/reports/CustomerDueReportScreen';
-import { ExpenseReportScreen, ProfitLossReportScreen } from '../screens/reports/CustomerDueReportScreen';
+import {
+  ExpenseReportScreen,
+  ProfitLossReportScreen,
+} from '../screens/reports/CustomerDueReportScreen';
 import { NotificationScreen } from '../screens/notifications/NotificationScreen';
 import { ProfileScreen } from '../screens/settings/ProfileScreen';
 import { AppSettingsScreen } from '../screens/settings/AppSettingsScreen';
@@ -54,32 +57,120 @@ export const RootNavigator = () => {
       ) : (
         <>
           <Stack.Screen name="Main" component={MainNavigator} options={{ headerShown: false }} />
-          <Stack.Screen name="CustomerDetails" component={CustomerDetailsScreen} options={{ title: 'কাস্টমার বিবরণ' }} />
-          <Stack.Screen name="AddEditCustomer" component={AddEditCustomerScreen} options={{ title: 'কাস্টমার' }} />
-          <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} options={{ title: 'অর্ডার বিবরণ' }} />
-          <Stack.Screen name="CreateOrder" component={CreateOrderScreen} options={{ title: 'নতুন অর্ডার' }} />
-          <Stack.Screen name="BatchList" component={BatchListScreen} options={{ title: 'ব্যাচ তালিকা' }} />
-          <Stack.Screen name="CreateBatch" component={CreateBatchScreen} options={{ title: 'নতুন ব্যাচ তৈরি' }} />
-          <Stack.Screen name="BatchDetails" component={BatchDetailsScreen} options={{ title: 'ব্যাচ বিবরণ' }} />
-          <Stack.Screen name="BatchDeliveryModal" component={BatchDeliveryModal} options={{ title: 'ডেলিভারি নিশ্চিত করুন' }} />
-          <Stack.Screen name="CompleteBatch" component={CompleteBatchScreen} options={{ title: 'ব্যাচ কমপ্লিট করুন' }} />
-          <Stack.Screen name="MonthlyBatchReport" component={MonthlyBatchReportScreen} options={{ title: 'মাসিক ব্যাচ রিপোর্ট' }} />
-          <Stack.Screen name="DeliveryEntry" component={DeliveryEntryScreen} options={{ title: 'ডেলিভারি এন্ট্রি' }} />
-          <Stack.Screen name="DeliveryDetails" component={DeliveryDetailsScreen} options={{ title: 'ডেলিভারি বিবরণ' }} />
-          <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ title: 'খরচ যোগ করুন' }} />
-          <Stack.Screen name="DailyClosing" component={DailyClosingScreen} options={{ title: 'দৈনিক হিসাব বন্ধ' }} />
-          <Stack.Screen name="DailyClosingHistory" component={DailyClosingHistoryScreen} options={{ title: 'বন্ধের ইতিহাস' }} />
-          <Stack.Screen name="DailyReport" component={DailyReportScreen} options={{ title: 'দৈনিক রিপোর্ট' }} />
-          <Stack.Screen name="MonthlyReport" component={MonthlyReportScreen} options={{ title: 'মাসিক রিপোর্ট' }} />
-          <Stack.Screen name="CustomerDueReport" component={CustomerDueReportScreen} options={{ title: 'বাকি রিপোর্ট' }} />
-          <Stack.Screen name="ExpenseReport" component={ExpenseReportScreen} options={{ title: 'খরচ রিপোর্ট' }} />
-          <Stack.Screen name="ProfitLossReport" component={ProfitLossReportScreen} options={{ title: 'লাভ/ক্ষতি রিপোর্ট' }} />
-          <Stack.Screen name="NotificationScreen" component={NotificationScreen} options={{ title: 'নোটিফিকেশন' }} />
+          <Stack.Screen
+            name="CustomerDetails"
+            component={CustomerDetailsScreen}
+            options={{ title: 'কাস্টমার বিবরণ' }}
+          />
+          <Stack.Screen
+            name="AddEditCustomer"
+            component={AddEditCustomerScreen}
+            options={{ title: 'কাস্টমার' }}
+          />
+          <Stack.Screen
+            name="OrderDetails"
+            component={OrderDetailsScreen}
+            options={{ title: 'অর্ডার বিবরণ' }}
+          />
+          <Stack.Screen
+            name="CreateOrder"
+            component={CreateOrderScreen}
+            options={{ title: 'নতুন অর্ডার' }}
+          />
+          <Stack.Screen
+            name="BatchList"
+            component={BatchListScreen}
+            options={{ title: 'ব্যাচ তালিকা' }}
+          />
+          <Stack.Screen
+            name="CreateBatch"
+            component={CreateBatchScreen}
+            options={{ title: 'নতুন ব্যাচ তৈরি' }}
+          />
+          <Stack.Screen
+            name="BatchDetails"
+            component={BatchDetailsScreen}
+            options={{ title: 'ব্যাচ বিবরণ' }}
+          />
+          <Stack.Screen
+            name="BatchDeliveryModal"
+            component={BatchDeliveryModal}
+            options={{ title: 'ডেলিভারি নিশ্চিত করুন' }}
+          />
+          <Stack.Screen
+            name="CompleteBatch"
+            component={CompleteBatchScreen}
+            options={{ title: 'ব্যাচ কমপ্লিট করুন' }}
+          />
+          <Stack.Screen
+            name="MonthlyBatchReport"
+            component={MonthlyBatchReportScreen}
+            options={{ title: 'মাসিক ব্যাচ রিপোর্ট' }}
+          />
+          <Stack.Screen
+            name="DeliveryEntry"
+            component={DeliveryEntryScreen}
+            options={{ title: 'ডেলিভারি এন্ট্রি' }}
+          />
+          <Stack.Screen
+            name="DeliveryDetails"
+            component={DeliveryDetailsScreen}
+            options={{ title: 'ডেলিভারি বিবরণ' }}
+          />
+          <Stack.Screen
+            name="AddExpense"
+            component={AddExpenseScreen}
+            options={{ title: 'খরচ যোগ করুন' }}
+          />
+          <Stack.Screen
+            name="DailyClosing"
+            component={DailyClosingScreen}
+            options={{ title: 'দৈনিক হিসাব বন্ধ' }}
+          />
+          <Stack.Screen
+            name="DailyClosingHistory"
+            component={DailyClosingHistoryScreen}
+            options={{ title: 'বন্ধের ইতিহাস' }}
+          />
+          <Stack.Screen
+            name="DailyReport"
+            component={DailyReportScreen}
+            options={{ title: 'দৈনিক রিপোর্ট' }}
+          />
+          <Stack.Screen
+            name="MonthlyReport"
+            component={MonthlyReportScreen}
+            options={{ title: 'মাসিক রিপোর্ট' }}
+          />
+          <Stack.Screen
+            name="CustomerDueReport"
+            component={CustomerDueReportScreen}
+            options={{ title: 'বাকি রিপোর্ট' }}
+          />
+          <Stack.Screen
+            name="ExpenseReport"
+            component={ExpenseReportScreen}
+            options={{ title: 'খরচ রিপোর্ট' }}
+          />
+          <Stack.Screen
+            name="ProfitLossReport"
+            component={ProfitLossReportScreen}
+            options={{ title: 'লাভ/ক্ষতি রিপোর্ট' }}
+          />
+          <Stack.Screen
+            name="NotificationScreen"
+            component={NotificationScreen}
+            options={{ title: 'নোটিফিকেশন' }}
+          />
           <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'প্রোফাইল' }} />
-          <Stack.Screen name="AppSettings" component={AppSettingsScreen} options={{ title: 'সেটিংস' }} />
-          <Stack.Screen name="CompanyOrderList"   component={CompanyOrderListScreen}   />
-<Stack.Screen name="CreateCompanyOrder" component={CreateCompanyOrderScreen} />
-<Stack.Screen name="CompanyOrderDetail" component={CompanyOrderDetailScreen} />
+          <Stack.Screen
+            name="AppSettings"
+            component={AppSettingsScreen}
+            options={{ title: 'সেটিংস' }}
+          />
+          <Stack.Screen name="CompanyOrderList" component={CompanyOrderListScreen} />
+          <Stack.Screen name="CreateCompanyOrder" component={CreateCompanyOrderScreen} />
+          <Stack.Screen name="CompanyOrderDetail" component={CompanyOrderDetailScreen} />
         </>
       )}
     </Stack.Navigator>

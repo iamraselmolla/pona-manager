@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { appLogger, auditLogger } from '../../utils/logger';
+import { recomputeBatch } from './batch';
 
 const prisma = new PrismaClient();
 
@@ -158,6 +159,15 @@ router.patch('/:id/receive', async (req, res) => {
       entityId: updated.id,
       after: updated,
     });
+
+    // If this company order linked to a batch, recompute batch summaries
+    if (updated.batchId) {
+      try {
+        await recomputeBatch(updated.batchId);
+      } catch (e) {
+        appLogger.error({ type: 'RECOMPUTE_BATCH_AFTER_COMPANY_RECEIVE_FAILED', error: (e as any).message });
+      }
+    }
 
     res.json({ success: true, data: updated });
   } catch (e: any) {
