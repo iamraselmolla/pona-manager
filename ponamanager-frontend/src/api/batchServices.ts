@@ -28,10 +28,10 @@ export const batchAPI = {
     apiClient.delete(`/batches/${batchId}/orders/${batchOrderId}`),
 
   // Link batch order to company order
-  linkCompanyOrder: (batchId: string, batchOrderId: string, companyOrderId: string) =>
-    apiClient.patch(`/batches/${batchId}/orders/${batchOrderId}/company-order`, {
-      companyOrderId,
-    }),
+  linkCompanyOrder: (batchId: string, companyOrderId: string) =>
+    apiClient.patch(`/batches/${batchId}/company-order`, { companyOrderId }),
+
+  unlinkCompanyOrder: (batchId: string) => apiClient.delete(`/batches/${batchId}/company-order`),
 
   // ── Delivery ─────────────────────────────────────────────────────────────────
   recordDelivery: (

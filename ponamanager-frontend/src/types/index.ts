@@ -104,6 +104,7 @@ export interface Batch {
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
+  companyOrders?: CompanyOrder[];
 }
 
 export interface Delivery {

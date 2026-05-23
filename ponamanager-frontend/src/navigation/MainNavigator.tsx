@@ -89,7 +89,7 @@ export const MainNavigator = () => {
       <Tab.Screen
         name="CompanyOrders"
         component={CompanyOrderListScreen}
-        options={{ title: 'কোম্পানি অর্ডার', tabBarLabel: 'কোম্পানি' }}
+        options={{ title: 'কোম্পানির অর্ডার', tabBarLabel: 'কোম্পানি' }}
       />
       <Tab.Screen
         name="Batches"

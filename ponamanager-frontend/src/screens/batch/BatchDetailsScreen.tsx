@@ -370,8 +370,9 @@ const ConnectCompanyOrderModal = ({
 
   useEffect(() => {
     if (!visible) return;
+    setLoading(true);
     companyOrderAPI
-      .getAll({ status: 'delivered' })
+      .getAll() // no status filter — show all
       .then((res) => {
         const raw = res?.data?.data;
         setOrders(Array.isArray(raw) ? raw : []);
@@ -379,11 +380,10 @@ const ConnectCompanyOrderModal = ({
       .catch(() => setOrders([]))
       .finally(() => setLoading(false));
   }, [visible]);
-
   const handleConnect = async (companyOrderId: string) => {
     setConnecting(companyOrderId);
     try {
-      await companyOrderAPI.update(companyOrderId, { batchId });
+      await batchAPI.linkCompanyOrder(batchId, companyOrderId);
       toast.success('কোম্পানি অর্ডার কানেক্ট হয়েছে');
       onConnected();
       onClose();
@@ -1434,12 +1434,9 @@ export const BatchDetailsScreen = () => {
       'এই ব্যাচ থেকে কোম্পানি অর্ডার কানেকশন সরাতে চান?',
       async () => {
         try {
-          const companyOrder = (batch as any)?.companyOrders?.[0];
-          if (companyOrder) {
-            await companyOrderAPI.update(companyOrder.id, { batchId: null });
-            toast.success('কোম্পানি অর্ডার সরানো হয়েছে');
-            fetchBatch();
-          }
+          await batchAPI.unlinkCompanyOrder(batchId);
+          toast.success('কোম্পানি অর্ডার সরানো হয়েছে');
+          fetchBatch();
         } catch {
           toast.error('সরানো ব্যর্থ');
         }
