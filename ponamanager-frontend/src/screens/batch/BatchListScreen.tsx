@@ -1,100 +1,139 @@
 // src/screens/batch/BatchListScreen.tsx
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Animated, Alert,
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  RefreshControl,
+  ActivityIndicator,
+  Animated,
+  Alert,
   Modal,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { batchAPI } from "../../api/batchServices";
-import { Batch, BatchStatus } from "../../types";
-import { formatCurrency, formatDate } from "../../utils/helpers";
-import dayjs from "dayjs";
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { batchAPI } from '../../api/batchServices';
+import { Batch, BatchStatus } from '../../types';
+import { formatCurrency, formatDate } from '../../utils/helpers';
+import dayjs from 'dayjs';
 
 // ── Design tokens ─────────────────────────────────────────
 const P = {
-  bg: "#0F1117", surface: "#1A1D27", border: "rgba(255,255,255,0.07)",
-  accent: "#6C63FF", accentSoft: "rgba(108,99,255,0.15)",
-  danger: "#FF5E7E", dangerSoft: "rgba(255,94,126,0.12)",
-  success: "#2ECC71", successSoft: "rgba(46,204,113,0.12)",
-  warning: "#F0A500", warningSoft: "rgba(240,165,0,0.12)",
-  info: "#3B9EFF", infoSoft: "rgba(59,158,255,0.12)",
-  teal: "#00C9A7", tealSoft: "rgba(0,201,167,0.12)",
-  gold: "#F5C542", goldSoft: "rgba(245,197,66,0.12)",
-  textPrimary: "#F0F2FF", textSecondary: "#8A8FA8",
-  textMuted: "#545872", white: "#FFFFFF",
+  bg: '#0F1117',
+  surface: '#1A1D27',
+  border: 'rgba(255,255,255,0.07)',
+  accent: '#6C63FF',
+  accentSoft: 'rgba(108,99,255,0.15)',
+  danger: '#FF5E7E',
+  dangerSoft: 'rgba(255,94,126,0.12)',
+  success: '#2ECC71',
+  successSoft: 'rgba(46,204,113,0.12)',
+  warning: '#F0A500',
+  warningSoft: 'rgba(240,165,0,0.12)',
+  info: '#3B9EFF',
+  infoSoft: 'rgba(59,158,255,0.12)',
+  teal: '#00C9A7',
+  tealSoft: 'rgba(0,201,167,0.12)',
+  gold: '#F5C542',
+  goldSoft: 'rgba(245,197,66,0.12)',
+  textPrimary: '#F0F2FF',
+  textSecondary: '#8A8FA8',
+  textMuted: '#545872',
+  white: '#FFFFFF',
 };
 
 // ── Status config ─────────────────────────────────────────
-const STATUS_CONFIG: Record<BatchStatus, { label: string; color: string; soft: string; icon: any }> = {
-  pending:     { label: "অপেক্ষমান", color: P.warning, soft: P.warningSoft, icon: "time-outline"            },
-  in_progress: { label: "চলমান",    color: P.info,    soft: P.infoSoft,    icon: "boat-outline"            },
-  completed:   { label: "সম্পন্ন",  color: P.success, soft: P.successSoft, icon: "checkmark-circle-outline"},
-  has_due:     { label: "বাকি আছে", color: P.danger,  soft: P.dangerSoft,  icon: "alert-circle-outline"    },
+const STATUS_CONFIG: Record<
+  BatchStatus,
+  { label: string; color: string; soft: string; icon: any }
+> = {
+  pending: { label: 'অপেক্ষমান', color: P.warning, soft: P.warningSoft, icon: 'time-outline' },
+  in_progress: { label: 'চলমান', color: P.info, soft: P.infoSoft, icon: 'boat-outline' },
+  completed: {
+    label: 'সম্পন্ন',
+    color: P.success,
+    soft: P.successSoft,
+    icon: 'checkmark-circle-outline',
+  },
+  has_due: { label: 'বাকি আছে', color: P.danger, soft: P.dangerSoft, icon: 'alert-circle-outline' },
 };
-const getSafeStatus = (s: string) => (STATUS_CONFIG as any)[s] ?? { label: s, color: P.textMuted, soft: "rgba(255,255,255,0.06)", icon: "help-circle-outline" };
+const getSafeStatus = (s: string) =>
+  (STATUS_CONFIG as any)[s] ?? {
+    label: s,
+    color: P.textMuted,
+    soft: 'rgba(255,255,255,0.06)',
+    icon: 'help-circle-outline',
+  };
 
 const PONA_CHIPS = [
-  { key: "Golda",    label: "গলদা",  color: P.gold, soft: P.goldSoft },
-  { key: "Bagda",    label: "বাগদা", color: P.info, soft: P.infoSoft },
-  { key: "Vannamei", label: "ভেনামি", color: P.teal, soft: P.tealSoft },
+  { key: 'Golda', label: 'গলদা', color: P.gold, soft: P.goldSoft },
+  { key: 'Bagda', label: 'বাগদা', color: P.info, soft: P.infoSoft },
+  { key: 'Vannamei', label: 'ভেনামি', color: P.teal, soft: P.tealSoft },
 ] as const;
 
 // ── Batch Card ────────────────────────────────────────────
 const BatchCard = ({
-  batch, index, onPress, onDelete,
+  batch,
+  index,
+  onPress,
+  onDelete,
 }: {
   batch: Batch;
   index: number;
   onPress: () => void;
   onDelete: () => void;
 }) => {
-  const cfg       = getSafeStatus(batch.status);
-  const total     = batch.batchOrders?.length ?? 0;
-  const delivered = batch.batchOrders?.filter((o) => o.deliveryStatus === "delivered").length ?? 0;
-  const pct       = total > 0 ? delivered / total : 0;
+  const cfg = getSafeStatus(batch.status);
+  const total = batch.batchOrders?.length ?? 0;
+  const delivered = batch.batchOrders?.filter((o) => o.deliveryStatus === 'delivered').length ?? 0;
+  const pct = total > 0 ? delivered / total : 0;
 
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(14)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 260, delay: Math.min(index * 45, 300), useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 260, delay: Math.min(index * 45, 300), useNativeDriver: true }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 260,
+        delay: Math.min(index * 45, 300),
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 260,
+        delay: Math.min(index * 45, 300),
+        useNativeDriver: true,
+      }),
     ]).start();
   }, []);
 
   // 3-dot menu options depend on status
-  const isCompleted = batch.status === "completed";
+  const isCompleted = batch.status === 'completed';
 
   const showMenu = () => {
-    const actions: any[] = [{ text: "বাতিল করুন", style: "cancel" }];
+    const actions: any[] = [{ text: 'বাতিল করুন', style: 'cancel' }];
 
     if (!isCompleted) {
       actions.push({
-        text: "🗑️  ব্যাচ মুছুন (সব অর্ডার মুক্ত হবে)",
-        style: "destructive",
+        text: '🗑️  ব্যাচ মুছুন (সব অর্ডার মুক্ত হবে)',
+        style: 'destructive',
         onPress: onDelete,
       });
     }
 
     Alert.alert(
       batch.batchNumber,
-      isCompleted
-        ? "সম্পন্ন ব্যাচ মুছে ফেলা যায় না।"
-        : "কী করতে চান?",
-      actions
+      isCompleted ? 'সম্পন্ন ব্যাচ মুছে ফেলা যায় না।' : 'কী করতে চান?',
+      actions,
     );
   };
 
   return (
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-      <TouchableOpacity
-        style={styles.card}
-        onPress={onPress}
-        activeOpacity={0.82}
-      >
+      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.82}>
         {/* Left accent stripe */}
         <View style={[styles.accentStripe, { backgroundColor: cfg.color }]} />
 
@@ -118,7 +157,10 @@ const BatchCard = ({
               {/* 3-dot menu button */}
               <TouchableOpacity
                 style={styles.menuBtn}
-                onPress={(e) => { e.stopPropagation?.(); showMenu(); }}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  showMenu();
+                }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 <Ionicons name="ellipsis-vertical" size={16} color={P.textMuted} />
@@ -129,9 +171,16 @@ const BatchCard = ({
           {/* Row 2: progress bar */}
           <View style={styles.progressRow}>
             <View style={styles.progressBg}>
-              <View style={[styles.progressFill, { width: `${Math.min(pct * 100, 100)}%`, backgroundColor: cfg.color }]} />
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${Math.min(pct * 100, 100)}%`, backgroundColor: cfg.color },
+                ]}
+              />
             </View>
-            <Text style={styles.progressLabel}>{delivered}/{total}</Text>
+            <Text style={styles.progressLabel}>
+              {delivered}/{total}
+            </Text>
           </View>
 
           {/* Row 3: pona chips + financials */}
@@ -139,12 +188,17 @@ const BatchCard = ({
             <View style={styles.ponaRow}>
               {PONA_CHIPS.map(({ key, label, color, soft }) => {
                 const ordered = (batch as any)[`totalOrdered${key}`] ?? 0;
-                const deld    = (batch as any)[`totalDelivered${key}`] ?? 0;
+                const deld = (batch as any)[`totalDelivered${key}`] ?? 0;
                 if (ordered === 0) return null;
                 return (
-                  <View key={key} style={[styles.ponaChip, { backgroundColor: soft, borderColor: color + "44" }]}>
+                  <View
+                    key={key}
+                    style={[styles.ponaChip, { backgroundColor: soft, borderColor: color + '44' }]}
+                  >
                     <Text style={[styles.ponaLabel, { color }]}>{label}</Text>
-                    <Text style={[styles.ponaVal, { color }]}>{deld}/{ordered}</Text>
+                    <Text style={[styles.ponaVal, { color }]}>
+                      {deld}/{ordered}
+                    </Text>
                   </View>
                 );
               })}
@@ -153,12 +207,16 @@ const BatchCard = ({
             <View style={styles.finRow}>
               <View style={[styles.finChip, { backgroundColor: P.successSoft }]}>
                 <Ionicons name="arrow-down-circle-outline" size={11} color={P.success} />
-                <Text style={[styles.finVal, { color: P.success }]}>{formatCurrency(batch.totalCollected)}</Text>
+                <Text style={[styles.finVal, { color: P.success }]}>
+                  {formatCurrency(batch.totalCollected)}
+                </Text>
               </View>
               {(batch.totalDue ?? 0) > 0 && (
                 <View style={[styles.finChip, { backgroundColor: P.dangerSoft }]}>
                   <Ionicons name="alert-circle-outline" size={11} color={P.danger} />
-                  <Text style={[styles.finVal, { color: P.danger }]}>{formatCurrency(batch.totalDue)}</Text>
+                  <Text style={[styles.finVal, { color: P.danger }]}>
+                    {formatCurrency(batch.totalDue)}
+                  </Text>
                   {(batch.duePendingCount ?? 0) > 0 && (
                     <View style={styles.countBubble}>
                       <Text style={styles.countBubbleText}>{batch.duePendingCount}</Text>
@@ -187,29 +245,33 @@ const BatchCard = ({
 };
 
 // ── Filters ───────────────────────────────────────────────
-const FILTERS: { key: BatchStatus | ""; label: string }[] = [
-  { key: "",           label: "সব"       },
-  { key: "pending",    label: "অপেক্ষমান" },
-  { key: "in_progress",label: "চলমান"    },
-  { key: "completed",  label: "সম্পন্ন"  },
-  { key: "has_due",    label: "বাকি"     },
+const FILTERS: { key: BatchStatus | ''; label: string }[] = [
+  { key: '', label: 'সব' },
+  { key: 'pending', label: 'অপেক্ষমান' },
+  { key: 'in_progress', label: 'চলমান' },
+  { key: 'completed', label: 'সম্পন্ন' },
+  { key: 'has_due', label: 'বাকি' },
 ];
 
 // ── Main Screen ───────────────────────────────────────────
 export const BatchListScreen = () => {
   const navigation = useNavigation<any>();
-  const [batches,      setBatches]      = useState<Batch[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [refreshing,   setRefreshing]   = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [monthFilter,  setMonthFilter]  = useState(dayjs().format("YYYY-MM"));
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [monthFilter, setMonthFilter] = useState(dayjs().format('YYYY-MM'));
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const fetchBatches = useCallback(async () => {
     try {
-      const res = await batchAPI.getAll({ month: monthFilter, status: statusFilter || undefined, limit: 50 });
+      const res = await batchAPI.getAll({
+        month: monthFilter,
+        status: statusFilter || undefined,
+        limit: 50,
+      });
       const raw = res?.data?.data?.data;
       setBatches(Array.isArray(raw) ? raw : []);
     } catch {
@@ -221,13 +283,21 @@ export const BatchListScreen = () => {
   }, [monthFilter, statusFilter]);
 
   // Reload on focus
-  useFocusEffect(useCallback(() => { setLoading(true); fetchBatches(); }, [fetchBatches]));
-  useEffect(() => { setLoading(true); fetchBatches(); }, [monthFilter, statusFilter]);
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      fetchBatches();
+    }, [fetchBatches]),
+  );
+  useEffect(() => {
+    setLoading(true);
+    fetchBatches();
+  }, [monthFilter, statusFilter]);
 
   // ── Delete batch ──────────────────────────────────────
   const handleDelete = (batch: Batch) => {
-    if (batch.status === "completed") {
-      Alert.alert("অনুমতি নেই", "সম্পন্ন ব্যাচ মুছে ফেলা যাবে না।");
+    if (batch.status === 'completed') {
+      Alert.alert('অনুমতি নেই', 'সম্পন্ন ব্যাচ মুছে ফেলা যাবে না।');
       return;
     }
     setSelectedBatch(batch);
@@ -244,7 +314,7 @@ export const BatchListScreen = () => {
       setConfirmVisible(false);
       setSelectedBatch(null);
     } catch (err: any) {
-      Alert.alert("ত্রুটি", err?.response?.data?.message || "মুছে ফেলা যায়নি");
+      Alert.alert('ত্রুটি', err?.response?.data?.message || 'মুছে ফেলা যায়নি');
     } finally {
       setDeleting(false);
     }
@@ -254,49 +324,67 @@ export const BatchListScreen = () => {
     <View style={styles.container}>
       {/* ── Month navigator ── */}
       <View style={styles.monthBar}>
-        <TouchableOpacity style={styles.monthArrow} onPress={() => setMonthFilter(dayjs(monthFilter).subtract(1, "month").format("YYYY-MM"))}>
+        <TouchableOpacity
+          style={styles.monthArrow}
+          onPress={() => setMonthFilter(dayjs(monthFilter).subtract(1, 'month').format('YYYY-MM'))}
+        >
           <Ionicons name="chevron-back" size={18} color={P.textSecondary} />
         </TouchableOpacity>
 
         <View style={styles.monthCenter}>
           <Ionicons name="calendar" size={13} color={P.accent} />
-          <Text style={styles.monthText}>{dayjs(monthFilter).format("MMMM YYYY")}</Text>
+          <Text style={styles.monthText}>{dayjs(monthFilter).format('MMMM YYYY')}</Text>
         </View>
 
-        <TouchableOpacity style={styles.monthArrow} onPress={() => setMonthFilter(dayjs(monthFilter).add(1, "month").format("YYYY-MM"))}>
+        <TouchableOpacity
+          style={styles.monthArrow}
+          onPress={() => setMonthFilter(dayjs(monthFilter).add(1, 'month').format('YYYY-MM'))}
+        >
           <Ionicons name="chevron-forward" size={18} color={P.textSecondary} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.reportBtn} onPress={() => navigation.navigate("MonthlyBatchReport", { month: monthFilter })}>
+        <TouchableOpacity
+          style={styles.reportBtn}
+          onPress={() => navigation.navigate('MonthlyBatchReport', { month: monthFilter })}
+        >
           <Ionicons name="bar-chart-outline" size={13} color={P.white} />
           <Text style={styles.reportBtnText}>রিপোর্ট</Text>
         </TouchableOpacity>
       </View>
 
       {/* ── Status filters ── */}
-      <FlatList
-        horizontal
-        data={FILTERS}
-        keyExtractor={(i) => i.key || "all"}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterList}
-        renderItem={({ item }) => {
-          const active = statusFilter === item.key;
-          const cfg    = item.key ? getSafeStatus(item.key) : null;
-          return (
-            <TouchableOpacity
-              style={[
-                styles.filterChip,
-                active && { backgroundColor: cfg ? cfg.soft : P.accentSoft, borderColor: cfg ? cfg.color + "55" : P.accent + "55" },
-              ]}
-              onPress={() => setStatusFilter(item.key)}
-            >
-              {cfg && <View style={[styles.filterDot, { backgroundColor: cfg.color }]} />}
-              <Text style={[styles.filterChipText, active && { color: cfg ? cfg.color : P.accent }]}>{item.label}</Text>
-            </TouchableOpacity>
-          );
-        }}
-      />
+      <View>
+        <FlatList
+          horizontal
+          data={FILTERS}
+          keyExtractor={(i) => i.key || 'all'}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterList}
+          renderItem={({ item }) => {
+            const active = statusFilter === item.key;
+            const cfg = item.key ? getSafeStatus(item.key) : null;
+            return (
+              <TouchableOpacity
+                style={[
+                  styles.filterChip,
+                  active && {
+                    backgroundColor: cfg ? cfg.soft : P.accentSoft,
+                    borderColor: cfg ? cfg.color + '55' : P.accent + '55',
+                  },
+                ]}
+                onPress={() => setStatusFilter(item.key)}
+              >
+                {cfg && <View style={[styles.filterDot, { backgroundColor: cfg.color }]} />}
+                <Text
+                  style={[styles.filterChipText, active && { color: cfg ? cfg.color : P.accent }]}
+                >
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          }}
+        />
+      </View>
 
       {/* ── List ── */}
       {loading ? (
@@ -312,14 +400,17 @@ export const BatchListScreen = () => {
             <BatchCard
               batch={item}
               index={index}
-              onPress={() => navigation.navigate("BatchDetails", { batchId: item.id })}
+              onPress={() => navigation.navigate('BatchDetails', { batchId: item.id })}
               onDelete={() => handleDelete(item)}
             />
           )}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => { setRefreshing(true); fetchBatches(); }}
+              onRefresh={() => {
+                setRefreshing(true);
+                fetchBatches();
+              }}
               colors={[P.accent]}
               tintColor={P.accent}
             />
@@ -345,7 +436,7 @@ export const BatchListScreen = () => {
         animationType="fade"
         onRequestClose={() => !deleting && setConfirmVisible(false)}
       >
-        <View style={styles.overlay} pointerEvents={deleting ? "none" : "auto"}>
+        <View style={styles.overlay} pointerEvents={deleting ? 'none' : 'auto'}>
           <View style={styles.modalCard}>
             <Text style={styles.title}>ব্যাচ মুছুন</Text>
             <Text style={styles.message}>
@@ -354,7 +445,7 @@ export const BatchListScreen = () => {
             <Text style={styles.subMessage}>
               {selectedBatch?.batchOrders?.length
                 ? `${selectedBatch.batchOrders.length} টি অর্ডার pending এ ফিরে যাবে।`
-                : "এই ব্যাচে কোনো অর্ডার নেই।"}
+                : 'এই ব্যাচে কোনো অর্ডার নেই।'}
             </Text>
 
             <View style={styles.actions}>
@@ -383,7 +474,7 @@ export const BatchListScreen = () => {
       </Modal>
 
       {/* ── FAB ── */}
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate("CreateBatch")}>
+      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('CreateBatch')}>
         <Ionicons name="add" size={28} color={P.white} />
       </TouchableOpacity>
     </View>
@@ -392,72 +483,219 @@ export const BatchListScreen = () => {
 
 // ── Styles ────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container:        { flex: 1, backgroundColor: P.bg },
-  monthBar:         { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: P.border },
-  monthArrow:       { width: 32, height: 32, borderRadius: 8, backgroundColor: P.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: P.border },
-  monthCenter:      { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  monthText:        { fontSize: 14, fontWeight: "800", color: P.textPrimary, letterSpacing: -0.2 },
-  reportBtn:        { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: P.accent, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
-  reportBtnText:    { color: P.white, fontWeight: "700", fontSize: 12 },
-  filterList:       { paddingHorizontal: 16, paddingVertical: 10, gap: 7 },
-  filterChip:       { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: P.surface, borderWidth: 1, borderColor: P.border },
-  filterDot:        { width: 7, height: 7, borderRadius: 4 },
-  filterChipText:   { fontSize: 12, fontWeight: "600", color: P.textSecondary },
+  container: { flex: 1, backgroundColor: P.bg },
+  monthBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: P.border,
+  },
+  monthArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: P.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: P.border,
+  },
+  monthCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  monthText: { fontSize: 14, fontWeight: '800', color: P.textPrimary, letterSpacing: -0.2 },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: P.accent,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  reportBtnText: { color: P.white, fontWeight: '700', fontSize: 12 },
+  filterList: { paddingHorizontal: 16, paddingVertical: 10, gap: 7 },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: P.surface,
+    borderWidth: 1,
+    borderColor: P.border,
+  },
+  filterDot: { width: 7, height: 7, borderRadius: 4 },
+  filterChipText: { fontSize: 12, fontWeight: '600', color: P.textSecondary },
 
   // Card
-  card:             { flexDirection: "row", backgroundColor: P.surface, borderRadius: 14, borderWidth: 1, borderColor: P.border, overflow: "hidden", marginBottom: 9 },
-  accentStripe:     { width: 4 },
-  cardInner:        { flex: 1, paddingHorizontal: 12, paddingVertical: 11 },
-  chevronWrap:      { justifyContent: "center", paddingRight: 10, paddingLeft: 2 },
+  card: {
+    flexDirection: 'row',
+    backgroundColor: P.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: P.border,
+    overflow: 'hidden',
+    marginBottom: 9,
+  },
+  accentStripe: { width: 4 },
+  cardInner: { flex: 1, paddingHorizontal: 12, paddingVertical: 11 },
+  chevronWrap: { justifyContent: 'center', paddingRight: 10, paddingLeft: 2 },
 
-  row1:             { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  row1Right:        { flexDirection: "row", alignItems: "center", gap: 6 },
-  batchNumWrap:     { gap: 2 },
-  batchNum:         { fontSize: 14, fontWeight: "900", color: P.textPrimary, letterSpacing: -0.2 },
-  dateChip:         { flexDirection: "row", alignItems: "center", gap: 3 },
-  dateText:         { fontSize: 10, color: P.textMuted },
-  statusPill:       { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
-  statusLabel:      { fontSize: 10, fontWeight: "700" },
-  menuBtn:          { width: 28, height: 28, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center" },
+  row1: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  row1Right: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  batchNumWrap: { gap: 2 },
+  batchNum: { fontSize: 14, fontWeight: '900', color: P.textPrimary, letterSpacing: -0.2 },
+  dateChip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  dateText: { fontSize: 10, color: P.textMuted },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  statusLabel: { fontSize: 10, fontWeight: '700' },
+  menuBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-  progressRow:      { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
-  progressBg:       { flex: 1, height: 4, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" },
-  progressFill:     { height: 4, borderRadius: 2 },
-  progressLabel:    { fontSize: 10, color: P.textMuted, minWidth: 28 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  progressBg: {
+    flex: 1,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: { height: 4, borderRadius: 2 },
+  progressLabel: { fontSize: 10, color: P.textMuted, minWidth: 28 },
 
-  row3:             { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6 },
-  ponaRow:          { flexDirection: "row", gap: 5, flexWrap: "wrap" },
-  ponaChip:         { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
-  ponaLabel:        { fontSize: 10, fontWeight: "600" },
-  ponaVal:          { fontSize: 11, fontWeight: "800" },
-  finRow:           { flexDirection: "row", gap: 5, alignItems: "center" },
-  finChip:          { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  finVal:           { fontSize: 11, fontWeight: "700" },
-  countBubble:      { backgroundColor: P.danger, borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1, marginLeft: 2 },
-  countBubbleText:  { color: P.white, fontSize: 9, fontWeight: "800" },
+  row3: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
+  ponaRow: { flexDirection: 'row', gap: 5, flexWrap: 'wrap' },
+  ponaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  ponaLabel: { fontSize: 10, fontWeight: '600' },
+  ponaVal: { fontSize: 11, fontWeight: '800' },
+  finRow: { flexDirection: 'row', gap: 5, alignItems: 'center' },
+  finChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  finVal: { fontSize: 11, fontWeight: '700' },
+  countBubble: {
+    backgroundColor: P.danger,
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginLeft: 2,
+  },
+  countBubbleText: { color: P.white, fontSize: 9, fontWeight: '800' },
 
   // Delete bar
-  deleteBar:        { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: "rgba(255,94,126,0.15)" },
-  deleteBarText:    { fontSize: 11, color: P.danger, fontWeight: "600" },
+  deleteBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,94,126,0.15)',
+  },
+  deleteBarText: { fontSize: 11, color: P.danger, fontWeight: '600' },
 
-  center:           { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  loadingText:      { color: P.textMuted, fontSize: 13 },
-  empty:            { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 10 },
-  emptyIconWrap:    { width: 80, height: 80, borderRadius: 24, backgroundColor: P.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: P.border, marginBottom: 4 },
-  emptyTitle:       { fontSize: 16, fontWeight: "700", color: P.textPrimary },
-  emptySubtitle:    { fontSize: 13, color: P.textMuted, textAlign: "center", paddingHorizontal: 40 },
-  listContent:      { padding: 14, paddingBottom: 90, flexGrow: 1 },
-  overlay:          { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 18 },
-  modalCard:        { width: "100%", maxWidth: 380, backgroundColor: P.white, borderRadius: 20, padding: 22, elevation: 10 },
-  title:            { fontSize: 20, fontWeight: "700", marginBottom: 12, color: "#111" },
-  message:          { fontSize: 16, color: "#333", lineHeight: 24 },
-  subMessage:       { marginTop: 10, fontSize: 14, color: "#666" },
-  actions:          { flexDirection: "row", justifyContent: "flex-end", marginTop: 24, gap: 12 },
-  button:           { paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12, minWidth: 100, alignItems: "center" },
-  cancelBtn:        { backgroundColor: "#f1f1f1" },
-  deleteBtn:        { backgroundColor: P.danger },
-  cancelText:       { fontWeight: "600", color: "#333" },
-  deleteText:       { fontWeight: "700", color: "#fff" },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  loadingText: { color: P.textMuted, fontSize: 13 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 10 },
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    backgroundColor: P.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: P.border,
+    marginBottom: 4,
+  },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: P.textPrimary },
+  emptySubtitle: { fontSize: 13, color: P.textMuted, textAlign: 'center', paddingHorizontal: 40 },
+  listContent: { padding: 14, paddingBottom: 90, flexGrow: 1 },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 18,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: P.white,
+    borderRadius: 20,
+    padding: 22,
+    elevation: 10,
+  },
+  title: { fontSize: 20, fontWeight: '700', marginBottom: 12, color: '#111' },
+  message: { fontSize: 16, color: '#333', lineHeight: 24 },
+  subMessage: { marginTop: 10, fontSize: 14, color: '#666' },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 24, gap: 12 },
+  button: {
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  cancelBtn: { backgroundColor: '#f1f1f1' },
+  deleteBtn: { backgroundColor: P.danger },
+  cancelText: { fontWeight: '600', color: '#333' },
+  deleteText: { fontWeight: '700', color: '#fff' },
 
-  fab:              { position: "absolute", bottom: 22, right: 20, width: 56, height: 56, borderRadius: 18, backgroundColor: P.accent, alignItems: "center", justifyContent: "center", elevation: 8, shadowColor: P.accent, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.45, shadowRadius: 10 },
+  fab: {
+    position: 'absolute',
+    bottom: 22,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: P.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: P.accent,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+  },
 });

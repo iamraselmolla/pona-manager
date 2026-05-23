@@ -9,6 +9,7 @@ import { OrderListScreen } from '../screens/orders/OrderListScreen';
 import { BatchListScreen } from '../screens/batch/BatchListScreen';
 import { ReportsDashboardScreen } from '../screens/reports/ReportsDashboardScreen';
 import { COLORS } from '../constants';
+import { CompanyOrderListScreen } from '../screens/company/CompanyOrderListScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -84,6 +85,11 @@ export const MainNavigator = () => {
         name="Orders"
         component={OrderListScreen}
         options={{ title: 'অর্ডার', tabBarLabel: 'অর্ডার' }}
+      />
+      <Tab.Screen
+        name="CompanyOrders"
+        component={CompanyOrderListScreen}
+        options={{ title: 'কোম্পানি অর্ডার', tabBarLabel: 'কোম্পানি' }}
       />
       <Tab.Screen
         name="Batches"
