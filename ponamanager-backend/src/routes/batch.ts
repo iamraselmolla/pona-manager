@@ -506,4 +506,48 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// PATCH /batches/:id/company-order — link or replace company order
+router.patch('/:id/company-order', async (req, res) => {
+  try {
+    const { companyOrderId } = req.body;
+    const batchId = req.params.id;
+
+    const batch = await prisma.batch.findUnique({ where: { id: batchId } });
+    if (!batch) return res.status(404).json({ success: false, message: 'Batch not found' });
+
+    await prisma.$transaction(async (tx) => {
+      // Remove old link if exists
+      await tx.companyOrder.updateMany({
+        where: { batchId },
+        data: { batchId: null },
+      });
+
+      // Set new link
+      if (companyOrderId) {
+        await tx.companyOrder.update({
+          where: { id: companyOrderId },
+          data: { batchId },
+        });
+      }
+    });
+
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: 'Failed to update company order link' });
+  }
+});
+
+// DELETE /batches/:id/company-order — remove link
+router.delete('/:id/company-order', async (req, res) => {
+  try {
+    await prisma.companyOrder.updateMany({
+      where: { batchId: req.params.id },
+      data: { batchId: null },
+    });
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: 'Failed to remove company order link' });
+  }
+});
+
 export { router as batchRoutes };

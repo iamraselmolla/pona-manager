@@ -156,11 +156,12 @@ model Payment {
 }
 
 model Expense {
-  id        String   @id @default(cuid())
+ id        String   @id @default(cuid())
   amount    Float
   category  String
   date      String
   notes     String?
+  batchId   String?
   createdAt DateTime @default(now())
 }
 

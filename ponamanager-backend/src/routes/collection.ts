@@ -19,9 +19,6 @@ router.get('/summary', async (req, res) => {
         status: true,
         totalCollected: true,
         totalDue: true,
-        totalCompanyMir: true,
-        totalCountingMir: true,
-        totalFishDelivered: true,
         duePendingCount: true,
         _count: {
           select: { batchOrders: true },

@@ -42,21 +42,44 @@ const computeNet = (
 // ── GET all ────────────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
+    console.log(req.query);
+
     const { status, ponaType } = req.query;
+
     const orders = await prisma.companyOrder.findMany({
       where: {
-        ...(status ? { status: status as string } : {}),
         ...(ponaType ? { ponaType: ponaType as string } : {}),
+
+        // 👇 SPECIAL CASE
+        ...(status === 'notAssigned'
+          ? { batchId: null }
+          : status
+            ? { status: status as string }
+            : {}),
       },
       orderBy: { createdAt: 'desc' },
       include: {
-        batch: { select: { batchNumber: true, status: true, batchDate: true } },
+        batch: {
+          select: {
+            batchNumber: true,
+            status: true,
+            batchDate: true,
+          },
+        },
       },
     });
-    res.json({ success: true, data: orders });
+
+    return res.json({ success: true, data: orders });
   } catch (e: any) {
-    appLogger.error({ type: 'COMPANY_ORDER_GET_FAILED', error: e.message });
-    res.status(500).json({ success: false, message: 'Failed' });
+    appLogger.error({
+      type: 'COMPANY_ORDER_GET_FAILED',
+      error: e.message,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed',
+    });
   }
 });
 
