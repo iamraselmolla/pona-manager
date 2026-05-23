@@ -168,9 +168,21 @@ export const RootNavigator = () => {
             component={AppSettingsScreen}
             options={{ title: 'সেটিংস' }}
           />
-          <Stack.Screen name="CompanyOrderList" component={CompanyOrderListScreen} />
-          <Stack.Screen name="CreateCompanyOrder" component={CreateCompanyOrderScreen} />
-          <Stack.Screen name="CompanyOrderDetail" component={CompanyOrderDetailScreen} />
+          <Stack.Screen
+            name="CompanyOrderList"
+            component={CompanyOrderListScreen}
+            options={{ title: 'কোম্পানি অর্ডার' }}
+          />
+          <Stack.Screen
+            name="CreateCompanyOrder"
+            component={CreateCompanyOrderScreen}
+            options={{ title: 'নতুন কোম্পানি অর্ডার' }}
+          />
+          <Stack.Screen
+            name="CompanyOrderDetail"
+            component={CompanyOrderDetailScreen}
+            options={{ title: 'কোম্পানি অর্ডার বিবরণ' }}
+          />
         </>
       )}
     </Stack.Navigator>
