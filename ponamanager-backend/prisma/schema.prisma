@@ -103,6 +103,7 @@ model BatchOrder {
   id                String    @id @default(cuid())
   batchId           String
   orderId           String
+  companyOrderId    String?   // Link to company order
   deliveryStatus    String    @default("pending")
   deliveredQuantity Float?
   deliveryRate      Float?
@@ -112,17 +113,24 @@ model BatchOrder {
   duePaymentDate    String?
   notes             String?
   deliveredAt       DateTime?
+  
+  // Mir fields
+  companyMir        Float?
+  ourMir            Float?
+  mirDiff           Float?
+  totalPoly         Float?
+  totalFish         Float?    // ourMir × totalPoly
+  deliveredPL       Float?
+  discount          Float?
+  isPartial         Boolean   @default(false)
+  remainingQuantity Float     @default(0)
+  
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  order Order @relation(fields: [orderId], references: [id])
-  companyMir     Float?
-//   ourMir         Float?
-//   mirDiff        Float?
-//   totalPoly      Float?
-//   totalFish      Float?    // ourMir × totalPoly
-//   ponaType       String?
+  batch        Batch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  order        Order         @relation(fields: [orderId], references: [id])
+  companyOrder CompanyOrder? @relation(fields: [companyOrderId], references: [id])
 }
 
 model BatchExpense {
@@ -228,4 +236,5 @@ model CompanyOrder {
   updatedAt       DateTime            @updatedAt
 
   batch           Batch?              @relation(fields: [batchId], references: [id])
+  batchOrders     BatchOrder[]        // Orders delivered for this company order
 }

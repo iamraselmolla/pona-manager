@@ -9,8 +9,6 @@ import { OrderListScreen } from '../screens/orders/OrderListScreen';
 import { BatchListScreen } from '../screens/batch/BatchListScreen';
 import { ReportsDashboardScreen } from '../screens/reports/ReportsDashboardScreen';
 import { COLORS } from '../constants';
-import { CompanyOrderListScreen } from '../screens/company/CompanyOrderListScreen';
-import { CollectionScreen } from '../screens/collection/CollectionScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -88,28 +86,6 @@ export const MainNavigator = () => {
         options={{ title: 'অর্ডার', tabBarLabel: 'অর্ডার' }}
       />
       <Tab.Screen
-        name="Collection"
-        component={CollectionScreen}
-        options={{
-          title: 'কালেকশন',
-          tabBarLabel: 'কালেকশন',
-          tabBarIcon: ({ focused, color, size }) => (
-            <Ionicons
-              name={focused ? 'analytics' : 'analytics-outline'}
-              size={size}
-              color={color}
-            />
-          ),
-        }}
-      />
-
-      <Tab.Screen
-        name="Company"
-        component={CompanyOrderListScreen}
-        options={{ title: 'কোম্পানি', tabBarLabel: 'কোম্পানি' }}
-      />
-
-      <Tab.Screen
         name="Batches"
         component={BatchListScreen}
         options={{ title: 'ব্যাচ', tabBarLabel: 'ব্যাচ' }}
@@ -119,7 +95,6 @@ export const MainNavigator = () => {
         component={ReportsDashboardScreen}
         options={{ title: 'রিপোর্ট', tabBarLabel: 'রিপোর্ট' }}
       />
-      {/* In MainNavigator or DashboardScreen quick actions */}
     </Tab.Navigator>
   );
 };

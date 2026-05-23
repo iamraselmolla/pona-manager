@@ -1,0 +1,13 @@
+-- AlterTable
+ALTER TABLE "BatchOrder" ADD COLUMN     "companyOrderId" TEXT,
+ADD COLUMN     "deliveredPL" DOUBLE PRECISION,
+ADD COLUMN     "discount" DOUBLE PRECISION,
+ADD COLUMN     "isPartial" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "mirDiff" DOUBLE PRECISION,
+ADD COLUMN     "ourMir" DOUBLE PRECISION,
+ADD COLUMN     "remainingQuantity" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "totalFish" DOUBLE PRECISION,
+ADD COLUMN     "totalPoly" DOUBLE PRECISION;
+
+-- AddForeignKey
+ALTER TABLE "BatchOrder" ADD CONSTRAINT "BatchOrder_companyOrderId_fkey" FOREIGN KEY ("companyOrderId") REFERENCES "CompanyOrder"("id") ON DELETE SET NULL ON UPDATE CASCADE;

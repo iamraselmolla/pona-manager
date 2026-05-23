@@ -67,6 +67,7 @@ router.get('/:id', async (req, res) => {
       where: { id: req.params.id },
       include: {
         batch: { select: { batchNumber: true, status: true, batchDate: true } },
+        batchOrders: { include: { order: true } },
       },
     });
     if (!order) return res.status(404).json({ success: false, message: 'Not found' });
@@ -165,7 +166,10 @@ router.patch('/:id/receive', async (req, res) => {
       try {
         await recomputeBatch(updated.batchId);
       } catch (e) {
-        appLogger.error({ type: 'RECOMPUTE_BATCH_AFTER_COMPANY_RECEIVE_FAILED', error: (e as any).message });
+        appLogger.error({
+          type: 'RECOMPUTE_BATCH_AFTER_COMPANY_RECEIVE_FAILED',
+          error: (e as any).message,
+        });
       }
     }
 

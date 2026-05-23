@@ -157,9 +157,12 @@ router.get('/:id', async (req, res) => {
     const batch = await prisma.batch.findUnique({
       where: { id: req.params.id },
       include: {
-        batchOrders: { include: { order: true } },
+        batchOrders: {
+          include: { order: true },
+          orderBy: { createdAt: 'asc' },
+        },
+        companyOrders: true, // ← এই লাইন যোগ করো
         expenses: true,
-        companyOrders: true,
       },
     });
     if (!batch) return res.status(404).json({ success: false, message: 'Batch not found' });
@@ -424,6 +427,45 @@ router.patch('/:id/complete', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Failed to complete batch' });
+  }
+});
+
+// ── PATCH /batches/:id/orders/:batchOrderId/company-order ────────────────
+router.patch('/:id/orders/:batchOrderId/company-order', async (req, res) => {
+  try {
+    const { companyOrderId } = req.body;
+
+    if (!companyOrderId) {
+      return res.status(400).json({ success: false, message: 'companyOrderId required' });
+    }
+
+    // Verify batch order exists
+    const batchOrder = await prisma.batchOrder.findUnique({
+      where: { id: req.params.batchOrderId },
+    });
+    if (!batchOrder) {
+      return res.status(404).json({ success: false, message: 'Batch order not found' });
+    }
+
+    // Verify company order exists
+    const companyOrder = await prisma.companyOrder.findUnique({
+      where: { id: companyOrderId },
+    });
+    if (!companyOrder) {
+      return res.status(404).json({ success: false, message: 'Company order not found' });
+    }
+
+    // Link batch order to company order
+    const updated = await prisma.batchOrder.update({
+      where: { id: req.params.batchOrderId },
+      data: { companyOrderId },
+      include: { order: true },
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to link company order' });
   }
 });
 
