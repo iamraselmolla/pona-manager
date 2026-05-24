@@ -171,6 +171,7 @@ import { orderAPI } from '../../api/services';
 import { Batch, BatchOrder } from '../../types';
 import { formatCurrency, formatDate, getPonaTypeColor } from '../../utils/helpers';
 import { showConfirm } from '../../utils/AppModal';
+import Animated from 'react-native-reanimated';
 
 // ─── Theme ─────────────────────────────────────────────────────────────────────
 const LIGHT = {
@@ -822,6 +823,7 @@ const DeliveryModal = ({
   saving: boolean;
 }) => {
   const T = useTheme();
+
   const [deliveredQty, setDeliveredQty] = useState('');
   const [companyMir, setCompanyMir] = useState('');
   const [ourMir, setOurMir] = useState('');
@@ -831,6 +833,8 @@ const DeliveryModal = ({
   const [payment, setPayment] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
+  const [forcePartial, setForcePartial] = useState(false);
+  const [customRemaining, setCustomRemaining] = useState('');
 
   useEffect(() => {
     if (batchOrder) {
@@ -843,6 +847,8 @@ const DeliveryModal = ({
       setPayment('');
       setDueDate('');
       setNotes('');
+      setForcePartial(false);
+      setCustomRemaining('');
     }
   }, [batchOrder]);
 
@@ -860,17 +866,28 @@ const DeliveryModal = ({
   const disc = parseFloat(discount) || 0;
   const paid = parseFloat(payment) || 0;
 
+  // If mir + poly provided → use ourMir × poly
   const actualQty = oMir > 0 && poly > 0 ? oMir * poly : qty;
-  const remaining = orderedQty - actualQty;
+  const autoRemain = Math.max(0, orderedQty - actualQty);
+
+  // Partial = switcher OR auto-detected
+  const isActPartial = forcePartial || (actualQty > 0 && actualQty < orderedQty);
+  const finalRemaining = customRemaining
+    ? Math.max(0, parseFloat(customRemaining) || autoRemain)
+    : autoRemain;
+
   const finalAmt = Math.max(0, actualQty * rate - disc);
   const dueAmt = Math.max(0, finalAmt - advance - paid);
-  const isActPartial = actualQty < orderedQty && actualQty > 0;
   const pct = orderedQty > 0 ? Math.min((actualQty / orderedQty) * 100, 100) : 0;
   const ourTotal = oMir * poly;
   const mirDiff = cMir * poly - ourTotal;
 
   const handleSubmit = () => {
-    if (!actualQty) {
+    console.log({
+      actualQty,
+      rate,
+    });
+    if (!actualQty || actualQty <= 0) {
       toast.warn('ডেলিভারি পরিমাণ দিন');
       return;
     }
@@ -883,31 +900,30 @@ const DeliveryModal = ({
       return;
     }
 
-    confirm(
-      isActPartial ? 'আংশিক ডেলিভারি' : 'ডেলিভারি নিশ্চিত',
-      isActPartial
-        ? `${actualQty.toLocaleString()} PL ডেলিভারি হবে। বাকি ${remaining.toLocaleString()} PL নতুন অর্ডার হবে।`
-        : `${actualQty.toLocaleString()} PL ডেলিভারি নিশ্চিত করুন?`,
-      () =>
-        onSubmit({
-          deliveredQuantity: actualQty,
-          companyMir: cMir || undefined,
-          ourMir: oMir || undefined,
-          totalPoly: poly || undefined,
-          mirDiff: cMir && oMir && poly ? mirDiff : undefined,
-          totalFish: ourTotal || undefined,
-          deliveredPL: poly || undefined,
-          deliveryRate: rate,
-          discount: disc,
-          customerPayment: paid,
-          dueAmount: dueAmt,
-          duePaymentDate: dueAmt > 0 && dueDate ? dueDate : undefined,
-          finalAmount: finalAmt,
-          isPartial: isActPartial,
-          remainingQuantity: isActPartial ? remaining : 0,
-          notes,
-        }),
-    );
+    const msg = isActPartial
+      ? `${actualQty.toLocaleString()} PL ডেলিভারি হবে। বাকি ${finalRemaining.toLocaleString()} PL নতুন অর্ডার হবে।`
+      : `${actualQty.toLocaleString()} PL ডেলিভারি নিশ্চিত করুন?`;
+
+    confirm(isActPartial ? 'আংশিক ডেলিভারি' : 'ডেলিভারি নিশ্চিত', msg, async () => {
+      await onSubmit({
+        deliveredQuantity: actualQty,
+        companyMir: cMir || undefined,
+        ourMir: oMir || undefined,
+        totalPoly: poly || undefined,
+        mirDiff: cMir && oMir && poly ? mirDiff : undefined,
+        totalFish: ourTotal || undefined,
+        deliveredPL: poly || undefined,
+        deliveryRate: rate,
+        discount: disc,
+        customerPayment: paid,
+        dueAmount: dueAmt,
+        duePaymentDate: dueAmt > 0 && dueDate ? dueDate : undefined,
+        finalAmount: finalAmt,
+        isPartial: isActPartial,
+        remainingQuantity: isActPartial ? finalRemaining : 0,
+        notes,
+      });
+    });
   };
 
   return (
@@ -922,7 +938,7 @@ const DeliveryModal = ({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={[mStyles.container, { backgroundColor: T.bg }]}>
-          {/* Header */}
+          {/* ── Header ── */}
           <View
             style={[mStyles.header, { backgroundColor: T.surface, borderBottomColor: T.border }]}
           >
@@ -946,7 +962,7 @@ const DeliveryModal = ({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Order info */}
+            {/* ── Order info ── */}
             <View
               style={[mStyles.infoCard, { backgroundColor: T.surface, borderTopColor: typeColor }]}
             >
@@ -980,7 +996,7 @@ const DeliveryModal = ({
               ))}
             </View>
 
-            {/* Mir section */}
+            {/* ── Mir section ── */}
             <View style={[mStyles.sectionCard, { backgroundColor: T.surface }]}>
               <View style={mStyles.sectionTitleRow}>
                 <View style={[mStyles.sectionTitleDot, { backgroundColor: T.info }]} />
@@ -1024,12 +1040,13 @@ const DeliveryModal = ({
               <MirCompare companyMir={cMir} ourMir={oMir} poly={poly} T={T} />
             </View>
 
-            {/* Quantity section */}
+            {/* ── Quantity section ── */}
             <View style={[mStyles.sectionCard, { backgroundColor: T.surface }]}>
               <View style={mStyles.sectionTitleRow}>
                 <View style={[mStyles.sectionTitleDot, { backgroundColor: typeColor }]} />
                 <Text style={[mStyles.sectionTitle, { color: T.textMuted }]}>ডেলিভারি পরিমাণ</Text>
               </View>
+
               {oMir > 0 && poly > 0 && (
                 <View style={[mStyles.autoFillNote, { backgroundColor: T.accentSoft }]}>
                   <Ionicons name="information-circle" size={13} color={T.accent} />
@@ -1038,6 +1055,7 @@ const DeliveryModal = ({
                   </Text>
                 </View>
               )}
+
               <InputField
                 label="ডেলিভারিকৃত পরিমাণ (PL)"
                 value={deliveredQty}
@@ -1046,6 +1064,8 @@ const DeliveryModal = ({
                 placeholder={`সর্বোচ্চ ${orderedQty.toLocaleString()}`}
                 T={T}
               />
+
+              {/* Progress bar */}
               {actualQty > 0 && (
                 <View style={mStyles.progressWrap}>
                   <View style={[mStyles.progressBg, { backgroundColor: T.border }]}>
@@ -1061,17 +1081,72 @@ const DeliveryModal = ({
                   </Text>
                 </View>
               )}
-              {isActPartial && (
-                <View style={[mStyles.partialBanner, { backgroundColor: T.infoSoft }]}>
-                  <Ionicons name="information-circle" size={14} color={T.info} />
-                  <Text style={[mStyles.partialBannerText, { color: T.info }]}>
-                    বাকি {remaining.toLocaleString()} PL নতুন অর্ডার হবে
+
+              {/* ── Partial switcher ── */}
+              <TouchableOpacity
+                style={[
+                  mStyles.partialSwitcher,
+                  {
+                    backgroundColor: forcePartial ? T.infoSoft : T.inputBg,
+                    borderColor: forcePartial ? T.info + '60' : T.border,
+                  },
+                ]}
+                onPress={() => {
+                  setForcePartial(!forcePartial);
+                  setCustomRemaining('');
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[mStyles.partialSwitcherTitle, { color: T.textPrimary }]}>
+                    আংশিক ডেলিভারি
                   </Text>
+                  <Text style={[mStyles.partialSwitcherSub, { color: T.textMuted }]}>
+                    চালু হলে বাকি PL নতুন অর্ডার হবে
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    mStyles.switchTrack,
+                    { backgroundColor: forcePartial ? T.info : T.border },
+                  ]}
+                >
+                  <Animated.View style={[mStyles.switchThumb, { left: forcePartial ? 20 : 2 }]} />
+                </View>
+              </TouchableOpacity>
+
+              {/* Remaining qty — editable */}
+              {isActPartial && (
+                <View
+                  style={[
+                    mStyles.remainingBox,
+                    { backgroundColor: T.infoSoft, borderColor: T.info + '33' },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[mStyles.remainingLabel, { color: T.info }]}>
+                      বাকি PL (নতুন অর্ডার)
+                    </Text>
+                    <Text style={[mStyles.remainingAuto, { color: T.textMuted }]}>
+                      {orderedQty} − {actualQty.toFixed(0)} = {autoRemain.toFixed(0)} PL
+                    </Text>
+                  </View>
+                  <TextInput
+                    style={[
+                      mStyles.remainingInput,
+                      { borderColor: T.info + '60', color: T.info, backgroundColor: T.inputBg },
+                    ]}
+                    value={customRemaining}
+                    onChangeText={setCustomRemaining}
+                    keyboardType="numeric"
+                    placeholder={autoRemain.toString()}
+                    placeholderTextColor={T.info + '80'}
+                  />
                 </View>
               )}
             </View>
 
-            {/* Payment section */}
+            {/* ── Payment section ── */}
             <View style={[mStyles.sectionCard, { backgroundColor: T.surface }]}>
               <View style={mStyles.sectionTitleRow}>
                 <View style={[mStyles.sectionTitleDot, { backgroundColor: T.success }]} />
@@ -1112,7 +1187,7 @@ const DeliveryModal = ({
               )}
             </View>
 
-            {/* Summary */}
+            {/* ── Summary ── */}
             <View style={[mStyles.sectionCard, { backgroundColor: T.surface }]}>
               <View style={mStyles.sectionTitleRow}>
                 <View style={[mStyles.sectionTitleDot, { backgroundColor: T.warning }]} />
@@ -1159,7 +1234,7 @@ const DeliveryModal = ({
                   {formatCurrency(dueAmt)}
                 </Text>
               </View>
-              {isActPartial && (
+              {isActPartial && finalRemaining > 0 && (
                 <View
                   style={[
                     mStyles.calcRow,
@@ -1173,13 +1248,13 @@ const DeliveryModal = ({
                 >
                   <Text style={[mStyles.calcLabel, { color: T.info }]}>নতুন অর্ডার (বাকি PL)</Text>
                   <Text style={[mStyles.calcVal, { color: T.info, fontWeight: '800' }]}>
-                    {remaining.toLocaleString()} PL
+                    {finalRemaining.toLocaleString()} PL
                   </Text>
                 </View>
               )}
             </View>
 
-            {/* Notes */}
+            {/* ── Notes ── */}
             <View style={[mStyles.sectionCard, { backgroundColor: T.surface }]}>
               <Text style={[mStyles.fieldLabel, { color: T.textSecondary }]}>নোট</Text>
               <TextInput
@@ -1198,7 +1273,7 @@ const DeliveryModal = ({
             <View style={{ height: 20 }} />
           </ScrollView>
 
-          {/* Submit */}
+          {/* ── Submit ── */}
           <View style={[mStyles.footer, { backgroundColor: T.surface, borderTopColor: T.border }]}>
             <TouchableOpacity
               style={[
@@ -2190,6 +2265,58 @@ const mStyles = StyleSheet.create({
   submitBtn: { borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
   submitBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   submitBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  partialSwitcher: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 13,
+    marginTop: 10,
+  },
+  partialSwitcherTitle: { fontSize: 13, fontWeight: '700' },
+  partialSwitcherSub: { fontSize: 11, marginTop: 2 },
+
+  switchTrack: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  switchThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#fff',
+    position: 'absolute',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+
+  remainingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 8,
+  },
+  remainingLabel: { fontSize: 12, fontWeight: '700' },
+  remainingAuto: { fontSize: 10, marginTop: 3 },
+  remainingInput: {
+    borderWidth: 1.5,
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 16,
+    fontWeight: '800',
+    width: 72,
+    textAlign: 'center',
+  },
 });
 
 // Connect modal styles
