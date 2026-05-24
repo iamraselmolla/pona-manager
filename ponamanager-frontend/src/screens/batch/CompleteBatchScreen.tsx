@@ -1,291 +1,662 @@
 // src/screens/batch/CompleteBatchScreen.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  useColorScheme,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import Toast from 'react-native-toast-message';
 import { batchAPI } from '../../api/batchServices';
-import { Batch, BatchExpense } from '../../types';
-import { COLORS } from '../../constants';
-import { formatCurrency } from '../../utils/helpers';
+import { formatCurrency, formatDate } from '../../utils/helpers';
+import { showModal, showConfirm } from '../../utils/AppModal';
 
-const EXPENSE_PRESETS = [
-  { label: 'পরিবহন', icon: 'car-outline' as const },
-  { label: 'লেবার', icon: 'people-outline' as const },
-  { label: 'খাবার/চা', icon: 'restaurant-outline' as const },
-  { label: 'অক্সিজেন', icon: 'water-outline' as const },
-  { label: 'প্যাকেজিং', icon: 'cube-outline' as const },
-  { label: 'অন্যান্য', icon: 'ellipsis-horizontal-circle-outline' as const },
-];
+// ─── Theme ─────────────────────────────────────────────────────────────────────
+const LIGHT = {
+  bg: '#F0F2F8',
+  surface: '#FFFFFF',
+  border: 'rgba(0,0,0,0.07)',
+  textPrimary: '#0D1117',
+  textSecondary: '#4B5563',
+  textMuted: '#9CA3AF',
+  accent: '#4F46E5',
+  accentSoft: 'rgba(79,70,229,0.09)',
+  success: '#059669',
+  successSoft: 'rgba(5,150,105,0.09)',
+  danger: '#DC2626',
+  dangerSoft: 'rgba(220,38,38,0.09)',
+  warning: '#D97706',
+  warningSoft: 'rgba(217,119,6,0.09)',
+  info: '#0284C7',
+  infoSoft: 'rgba(2,132,199,0.09)',
+  inputBg: '#F0F2F8',
+};
+const DARK = {
+  bg: '#080B12',
+  surface: '#111622',
+  border: 'rgba(255,255,255,0.06)',
+  textPrimary: '#EEF0FF',
+  textSecondary: '#8892B0',
+  textMuted: '#4A5568',
+  accent: '#6366F1',
+  accentSoft: 'rgba(99,102,241,0.15)',
+  success: '#10B981',
+  successSoft: 'rgba(16,185,129,0.12)',
+  danger: '#F87171',
+  dangerSoft: 'rgba(248,113,113,0.12)',
+  warning: '#FBBF24',
+  warningSoft: 'rgba(251,191,36,0.12)',
+  info: '#38BDF8',
+  infoSoft: 'rgba(56,189,248,0.12)',
+  inputBg: '#0D1117',
+};
+const useTheme = () => (useColorScheme() === 'dark' ? DARK : LIGHT);
 
+// ─── Expense categories ─────────────────────────────────────────────────────────
+const CATEGORIES = ['Transport', 'Labor', 'Food', 'Fuel', 'Repair', 'Other'];
+
+// ─── Expense row ────────────────────────────────────────────────────────────────
+const ExpenseRow = ({ expense, onDelete, T }: any) => (
+  <View style={[erStyles.row, { backgroundColor: T.surface, borderColor: T.border }]}>
+    <View style={[erStyles.catDot, { backgroundColor: T.warningSoft }]}>
+      <Ionicons name="receipt-outline" size={13} color={T.warning} />
+    </View>
+    <View style={{ flex: 1 }}>
+      <Text style={[erStyles.label, { color: T.textPrimary }]}>{expense.label}</Text>
+      <Text style={[erStyles.cat, { color: T.textMuted }]}>{expense.category}</Text>
+    </View>
+    <Text style={[erStyles.amount, { color: T.warning }]}>{formatCurrency(expense.amount)}</Text>
+    <TouchableOpacity onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <Ionicons name="trash-outline" size={15} color={T.danger} />
+    </TouchableOpacity>
+  </View>
+);
+const erStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+  },
+  catDot: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  label: { fontSize: 13, fontWeight: '600' },
+  cat: { fontSize: 10, marginTop: 2 },
+  amount: { fontSize: 14, fontWeight: '800' },
+});
+
+// ─── Main Screen ────────────────────────────────────────────────────────────────
 export const CompleteBatchScreen = () => {
+  const T = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { batchId } = route.params;
 
-  const [batch, setBatch] = useState<Batch | null>(null);
+  const [batch, setBatch] = useState<any>(null);
+  const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [completing, setCompleting] = useState(false);
 
-  const [expenses, setExpenses] = useState<BatchExpense[]>(
-    EXPENSE_PRESETS.map((p) => ({ label: p.label, amount: 0 }))
-  );
-  const [customExpenses, setCustomExpenses] = useState<BatchExpense[]>([]);
+  // Add expense form
+  const [label, setLabel] = useState('');
+  const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState('Transport');
+  const [notes, setNotes] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+
+  const fadeAnim = useState(new Animated.Value(0))[0];
+
+  const loadData = useCallback(async () => {
+    try {
+      const [batchRes, expRes] = await Promise.all([
+        batchAPI.getById(batchId),
+        batchAPI.getExpenses(batchId),
+      ]);
+      setBatch(batchRes.data.data);
+      const raw = expRes?.data?.data;
+      setExpenses(Array.isArray(raw) ? raw : []);
+    } catch {
+      Toast.show({ type: 'error', text1: 'লোড ব্যর্থ' });
+    } finally {
+      setLoading(false);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+    }
+  }, [batchId]);
 
   useEffect(() => {
-    batchAPI.getById(batchId).then((res) => {
-      setBatch(res.data.data);
-      setLoading(false);
-    }).catch(() => { Alert.alert('ত্রুটি', 'ডেটা লোড হয়নি'); navigation.goBack(); });
+    loadData();
   }, []);
 
-  const updateExpense = (idx: number, amount: string) => {
-    setExpenses((prev) => prev.map((e, i) => i === idx ? { ...e, amount: parseFloat(amount) || 0 } : e));
+  // Add expense
+  const handleAddExpense = async () => {
+    if (!label.trim()) {
+      Toast.show({ type: 'error', text1: 'খরচের নাম দিন' });
+      return;
+    }
+    if (!amount) {
+      Toast.show({ type: 'error', text1: 'পরিমাণ দিন' });
+      return;
+    }
+    setAdding(true);
+    try {
+      await batchAPI.addExpense(batchId, {
+        label: label.trim(),
+        amount: parseFloat(amount),
+        category,
+        notes: notes.trim() || undefined,
+      });
+      setLabel('');
+      setAmount('');
+      setNotes('');
+      setShowForm(false);
+      Toast.show({ type: 'success', text1: 'খরচ যোগ হয়েছে' });
+      loadData();
+    } catch (e: any) {
+      Toast.show({ type: 'error', text1: 'ত্রুটি', text2: e?.response?.data?.message || 'ব্যর্থ' });
+    } finally {
+      setAdding(false);
+    }
   };
 
-  const addCustomExpense = () => {
-    setCustomExpenses((prev) => [...prev, { label: '', amount: 0 }]);
-  };
-
-  const updateCustomExpense = (idx: number, field: 'label' | 'amount', value: string) => {
-    setCustomExpenses((prev) =>
-      prev.map((e, i) => i === idx ? { ...e, [field]: field === 'amount' ? parseFloat(value) || 0 : value } : e)
+  // Delete expense (called from Delete confirm modal)
+  const handleDeleteExpense = async (expenseId: string) => {
+    showConfirm(
+      'এই খরচটি মুছে দিতে চান?',
+      async () => {
+        try {
+          await batchAPI.deleteExpense(batchId, expenseId);
+          showModal({ type: 'success', message: 'খরচ মুছে গেছে', autoDismiss: 1500 });
+          loadData();
+        } catch {
+          showModal({ type: 'error', message: 'মুছতে ব্যর্থ' });
+        }
+      },
+      undefined,
+      'খরচ মুছুন',
     );
   };
 
-  const removeCustomExpense = (idx: number) => {
-    setCustomExpenses((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const allExpenses = [
-    ...expenses.filter((e) => e.amount > 0),
-    ...customExpenses.filter((e) => e.label && e.amount > 0),
-  ];
-
-  const totalExpenses = allExpenses.reduce((s, e) => s + e.amount, 0);
-  const netProfit = (batch?.totalCollected || 0) - totalExpenses;
-
-  const handleComplete = () => {
-    Alert.alert(
-      'ব্যাচ কমপ্লিট করুন',
-      `মোট খরচ: ${formatCurrency(totalExpenses)}\nনেট প্রফিট: ${formatCurrency(netProfit)}\n\nনিশ্চিত করতে চান?`,
-      [
-        { text: 'না', style: 'cancel' },
-        {
-          text: 'হ্যাঁ, কমপ্লিট করুন',
-          style: 'default',
-          onPress: async () => {
-            setSaving(true);
-            try {
-              await batchAPI.completeBatch(batchId, allExpenses);
-              Alert.alert('সফল!', 'ব্যাচ সম্পন্ন হয়েছে!', [
-                { text: 'OK', onPress: () => navigation.navigate('BatchList') },
-              ]);
-            } catch (err: any) {
-              Alert.alert('ত্রুটি', err.response?.data?.message || 'ব্যাচ কমপ্লিট ব্যর্থ');
-            } finally {
-              setSaving(false);
-            }
-          },
-        },
-      ]
+  // Complete batch
+  const tryComplete = () => {
+    if (expenses.length === 0) {
+      showConfirm('এই ব্যাচে কোনো খরচ নেই। খরচ ছাড়াই বন্ধ করতে চান?', () =>
+        showConfirm(
+          `${batch.batchNumber} সম্পন্ন করতে চান?\nসংগ্রহ: ${formatCurrency(totalCollected)} · খরচ: ${formatCurrency(0)} · নিট: ${formatCurrency(netProfit)}`,
+          handleComplete,
+        ),
+      );
+      return;
+    }
+    showConfirm(
+      `${batch.batchNumber} সম্পন্ন করতে চান?\nসংগ্রহ: ${formatCurrency(totalCollected)} · খরচ: ${formatCurrency(totalExpenses)} · নিট: ${formatCurrency(netProfit)}`,
+      handleComplete,
     );
   };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
+  const handleComplete = async () => {
+    setCompleting(true);
+    try {
+      await batchAPI.complete(batchId);
+      showModal({
+        type: 'success',
+        title: 'ব্যাচ সম্পন্ন!',
+        message: `${batch.batchNumber} সফলভাবে বন্ধ হয়েছে`,
+        autoDismiss: 2000,
+      });
+      navigation.goBack();
+    } catch (e: any) {
+      showModal({
+        type: 'error',
+        title: 'ত্রুটি',
+        message: e?.response?.data?.message || 'ব্যাচ বন্ধ ব্যর্থ',
+      });
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  if (loading)
+    return (
+      <View style={[styles.center, { backgroundColor: T.bg }]}>
+        <ActivityIndicator size="large" color={T.accent} />
+      </View>
+    );
+
   if (!batch) return null;
 
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+  const totalCollected = batch.totalCollected ?? 0;
+  const totalDue = batch.totalDue ?? 0;
+  const netProfit = totalCollected - totalExpenses;
+  const pendingCount =
+    batch.batchOrders?.filter((o: any) => o.deliveryStatus === 'pending').length ?? 0;
+  const canComplete = pendingCount === 0;
+
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-        {/* Batch summary reminder */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>{batch.batchNumber} — সারসংক্ষেপ</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>মোট অর্ডার</Text>
-            <Text style={styles.summaryValue}>{batch.batchOrders?.length || 0} টি</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>মোট প্রাপ্ত</Text>
-            <Text style={[styles.summaryValue, { color: COLORS.success }]}>
-              {formatCurrency(batch.totalCollected)}
-            </Text>
-          </View>
-          {batch.totalDue > 0 && (
-            <View style={[styles.summaryRow, styles.dueSummaryRow]}>
-              <Text style={styles.summaryLabel}>মোট বাকি ({batch.duePendingCount} জন)</Text>
-              <Text style={[styles.summaryValue, { color: COLORS.danger }]}>
-                {formatCurrency(batch.totalDue)}
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: T.bg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <Animated.ScrollView
+        style={{ opacity: fadeAnim }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* ── Batch hero ── */}
+        <View style={[styles.hero, { backgroundColor: T.surface, borderColor: T.border }]}>
+          <View style={styles.heroTop}>
+            <View>
+              <Text style={[styles.heroLabel, { color: T.textMuted }]}>ব্যাচ বন্ধ</Text>
+              <Text style={[styles.heroBatchNum, { color: T.textPrimary }]}>
+                {batch.batchNumber}
+              </Text>
+              <Text style={[styles.heroDate, { color: T.textMuted }]}>
+                {formatDate(batch.batchDate)}
               </Text>
             </View>
-          )}
+            {pendingCount > 0 && (
+              <View style={[styles.pendingBadge, { backgroundColor: T.dangerSoft }]}>
+                <Ionicons name="warning-outline" size={13} color={T.danger} />
+                <Text style={[styles.pendingBadgeText, { color: T.danger }]}>
+                  {pendingCount} ডেলিভারি বাকি
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Financial summary */}
+          <View style={styles.heroStats}>
+            <View style={[styles.heroStat, { backgroundColor: T.successSoft }]}>
+              <Text style={[styles.heroStatLabel, { color: T.textMuted }]}>সংগ্রহ</Text>
+              <Text style={[styles.heroStatVal, { color: T.success }]}>
+                {formatCurrency(totalCollected)}
+              </Text>
+            </View>
+            <View style={[styles.heroStat, { backgroundColor: T.warningSoft }]}>
+              <Text style={[styles.heroStatLabel, { color: T.textMuted }]}>খরচ</Text>
+              <Text style={[styles.heroStatVal, { color: T.warning }]}>
+                {formatCurrency(totalExpenses)}
+              </Text>
+            </View>
+            {totalDue > 0 && (
+              <View style={[styles.heroStat, { backgroundColor: T.dangerSoft }]}>
+                <Text style={[styles.heroStatLabel, { color: T.textMuted }]}>বাকি</Text>
+                <Text style={[styles.heroStatVal, { color: T.danger }]}>
+                  {formatCurrency(totalDue)}
+                </Text>
+              </View>
+            )}
+            <View
+              style={[
+                styles.heroStat,
+                { backgroundColor: netProfit >= 0 ? T.successSoft : T.dangerSoft },
+              ]}
+            >
+              <Text style={[styles.heroStatLabel, { color: T.textMuted }]}>নিট লাভ</Text>
+              <Text style={[styles.heroStatVal, { color: netProfit >= 0 ? T.success : T.danger }]}>
+                {netProfit >= 0 ? '+' : ''}
+                {formatCurrency(netProfit)}
+              </Text>
+            </View>
+          </View>
         </View>
 
-        {/* Expense entry */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>খরচের হিসাব</Text>
-          <Text style={styles.cardSubtitle}>
-            ব্যাচ কমপ্লিট করতে আজকের সব খরচ যোগ করুন
-          </Text>
+        {/* ── Expense list ── */}
+        <View style={styles.section}>
+          <View style={styles.sectionRow}>
+            <Text style={[styles.sectionTitle, { color: T.textMuted }]}>
+              খরচের তালিকা ({expenses.length})
+            </Text>
+            <TouchableOpacity
+              style={[styles.addExpBtn, { backgroundColor: T.accentSoft, borderColor: T.accent }]}
+              onPress={() => setShowForm(!showForm)}
+            >
+              <Ionicons name={showForm ? 'close' : 'add'} size={14} color={T.accent} />
+              <Text style={[styles.addExpBtnText, { color: T.accent }]}>
+                {showForm ? 'বাতিল' : 'খরচ যোগ'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-          {expenses.map((expense, idx) => {
-            const preset = EXPENSE_PRESETS[idx];
-            return (
-              <View key={idx} style={styles.expenseItem}>
-                <View style={[styles.expenseIconBox, { backgroundColor: COLORS.primary + '15' }]}>
-                  <Ionicons name={preset.icon} size={18} color={COLORS.primary} />
-                </View>
-                <Text style={styles.expenseItemLabel}>{expense.label}</Text>
-                <View style={styles.expenseInputWrapper}>
+          {/* Add form */}
+          {showForm && (
+            <View
+              style={[styles.addForm, { backgroundColor: T.surface, borderColor: T.accent + '44' }]}
+            >
+              <View style={[styles.formAccent, { backgroundColor: T.accent }]} />
+              <View style={styles.formBody}>
+                {/* Label */}
+                <View
+                  style={[styles.inputWrap, { borderColor: T.border, backgroundColor: T.inputBg }]}
+                >
                   <TextInput
-                    style={styles.expenseInput}
-                    value={expense.amount ? expense.amount.toString() : ''}
-                    onChangeText={(v) => updateExpense(idx, v)}
-                    keyboardType="numeric"
-                    placeholder="0"
-                    placeholderTextColor={COLORS.textMuted}
+                    style={[styles.input, { color: T.textPrimary }]}
+                    value={label}
+                    onChangeText={setLabel}
+                    placeholder="খরচের বিবরণ"
+                    placeholderTextColor={T.textMuted}
                   />
-                  <Text style={styles.expenseSuffix}>৳</Text>
                 </View>
+
+                {/* Amount */}
+                <View
+                  style={[styles.inputWrap, { borderColor: T.border, backgroundColor: T.inputBg }]}
+                >
+                  <TextInput
+                    style={[styles.input, { color: T.textPrimary }]}
+                    value={amount}
+                    onChangeText={setAmount}
+                    keyboardType="numeric"
+                    placeholder="পরিমাণ (৳)"
+                    placeholderTextColor={T.textMuted}
+                  />
+                  <Text style={[styles.inputSuffix, { color: T.textMuted }]}>৳</Text>
+                </View>
+
+                {/* Category */}
+                <View style={styles.catRow}>
+                  {CATEGORIES.map((cat) => {
+                    const active = category === cat;
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[
+                          styles.catChip,
+                          {
+                            backgroundColor: active ? T.accentSoft : T.inputBg,
+                            borderColor: active ? T.accent : T.border,
+                          },
+                        ]}
+                        onPress={() => setCategory(cat)}
+                      >
+                        <Text
+                          style={[
+                            styles.catChipText,
+                            {
+                              color: active ? T.accent : T.textMuted,
+                              fontWeight: active ? '700' : '400',
+                            },
+                          ]}
+                        >
+                          {cat}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Notes */}
+                <View
+                  style={[styles.inputWrap, { borderColor: T.border, backgroundColor: T.inputBg }]}
+                >
+                  <TextInput
+                    style={[styles.input, { color: T.textPrimary }]}
+                    value={notes}
+                    onChangeText={setNotes}
+                    placeholder="নোট (ঐচ্ছিক)"
+                    placeholderTextColor={T.textMuted}
+                  />
+                </View>
+
+                {/* Submit */}
+                <TouchableOpacity
+                  style={[
+                    styles.addFormBtn,
+                    { backgroundColor: adding ? T.accent + '80' : T.accent },
+                  ]}
+                  onPress={handleAddExpense}
+                  disabled={adding}
+                >
+                  {adding ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="add-circle-outline" size={16} color="#fff" />
+                      <Text style={styles.addFormBtnText}>যোগ করুন</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
               </View>
-            );
-          })}
-
-          {/* Custom expenses */}
-          {customExpenses.map((e, idx) => (
-            <View key={`custom-${idx}`} style={styles.customExpenseItem}>
-              <TextInput
-                style={styles.customLabelInput}
-                value={e.label}
-                onChangeText={(v) => updateCustomExpense(idx, 'label', v)}
-                placeholder="খরচের নাম"
-                placeholderTextColor={COLORS.textMuted}
-              />
-              <View style={styles.expenseInputWrapper}>
-                <TextInput
-                  style={styles.expenseInput}
-                  value={e.amount ? e.amount.toString() : ''}
-                  onChangeText={(v) => updateCustomExpense(idx, 'amount', v)}
-                  keyboardType="numeric"
-                  placeholder="0"
-                  placeholderTextColor={COLORS.textMuted}
-                />
-                <Text style={styles.expenseSuffix}>৳</Text>
-              </View>
-              <TouchableOpacity onPress={() => removeCustomExpense(idx)}>
-                <Ionicons name="close-circle" size={22} color={COLORS.danger} />
-              </TouchableOpacity>
-            </View>
-          ))}
-
-          <TouchableOpacity style={styles.addExpenseBtn} onPress={addCustomExpense}>
-            <Ionicons name="add-circle-outline" size={18} color={COLORS.primary} />
-            <Text style={styles.addExpenseBtnText}>অন্য খরচ যোগ করুন</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Totals card */}
-        <View style={styles.totalsCard}>
-          <Text style={styles.totalsTitle}>সামগ্রিক হিসাব</Text>
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsLabel}>মোট প্রাপ্ত</Text>
-            <Text style={[styles.totalsValue, { color: COLORS.success }]}>
-              {formatCurrency(batch.totalCollected)}
-            </Text>
-          </View>
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsLabel}>মোট খরচ</Text>
-            <Text style={[styles.totalsValue, { color: COLORS.warning }]}>
-              - {formatCurrency(totalExpenses)}
-            </Text>
-          </View>
-          {batch.totalDue > 0 && (
-            <View style={[styles.totalsRow, { backgroundColor: COLORS.dangerLight, borderRadius: 6, paddingHorizontal: 8 }]}>
-              <Text style={styles.totalsLabel}>বাকি (পাওনা)</Text>
-              <Text style={[styles.totalsValue, { color: COLORS.danger }]}>
-                {formatCurrency(batch.totalDue)}
-              </Text>
             </View>
           )}
-          <View style={[styles.totalsRow, styles.netProfitRow]}>
-            <Text style={styles.netProfitLabel}>নেট লাভ/ক্ষতি</Text>
-            <Text style={[styles.netProfitValue, { color: netProfit >= 0 ? COLORS.success : COLORS.danger }]}>
+
+          {/* Expense items */}
+          {expenses.length === 0 ? (
+            <View style={[styles.emptyExp, { backgroundColor: T.surface, borderColor: T.border }]}>
+              <Ionicons name="receipt-outline" size={28} color={T.textMuted} />
+              <Text style={[styles.emptyExpTitle, { color: T.textPrimary }]}>কোনো খরচ নেই</Text>
+              <Text style={[styles.emptyExpSub, { color: T.textMuted }]}>
+                ব্যাচ বন্ধ করার আগে খরচ যোগ করুন
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.expList}>
+              {expenses.map((exp) => (
+                <ExpenseRow
+                  key={exp.id}
+                  expense={exp}
+                  T={T}
+                  onDelete={() =>
+                    showConfirm('এই খরচটি মুছে দিতে চান?', () => handleDeleteExpense(exp.id))
+                  }
+                />
+              ))}
+              {/* Total row */}
+              <View
+                style={[
+                  styles.totalRow,
+                  { backgroundColor: T.warningSoft, borderColor: T.warning + '33' },
+                ]}
+              >
+                <Text style={[styles.totalLabel, { color: T.warning }]}>মোট খরচ</Text>
+                <Text style={[styles.totalValue, { color: T.warning }]}>
+                  {formatCurrency(totalExpenses)}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* ── Net profit summary ── */}
+        <View style={styles.section}>
+          <View
+            style={[
+              styles.profitCard,
+              {
+                backgroundColor: netProfit >= 0 ? T.successSoft : T.dangerSoft,
+                borderColor: netProfit >= 0 ? T.success + '33' : T.danger + '33',
+              },
+            ]}
+          >
+            <View>
+              <Text style={[styles.profitLabel, { color: T.textMuted }]}>
+                সংগ্রহ − খরচ = নিট লাভ
+              </Text>
+              <Text style={[styles.profitCalc, { color: T.textSecondary }]}>
+                {formatCurrency(totalCollected)} − {formatCurrency(totalExpenses)}
+              </Text>
+            </View>
+            <Text style={[styles.profitValue, { color: netProfit >= 0 ? T.success : T.danger }]}>
+              {netProfit >= 0 ? '+' : ''}
               {formatCurrency(netProfit)}
             </Text>
           </View>
         </View>
 
-        {/* Complete button */}
-        <TouchableOpacity style={styles.completeBtn} onPress={handleComplete} disabled={saving}>
-          {saving ? (
-            <ActivityIndicator color={COLORS.white} />
+        {/* ── Complete button ── */}
+        <View style={[styles.section, { paddingBottom: 40 }]}>
+          {!canComplete ? (
+            <View
+              style={[
+                styles.cantComplete,
+                { backgroundColor: T.dangerSoft, borderColor: T.danger + '33' },
+              ]}
+            >
+              <Ionicons name="warning-outline" size={16} color={T.danger} />
+              <Text style={[styles.cantCompleteText, { color: T.danger }]}>
+                {pendingCount}টি ডেলিভারি বাকি আছে। সব ডেলিভারি সম্পন্ন করুন।
+              </Text>
+            </View>
           ) : (
-            <>
-              <Ionicons name="lock-closed" size={20} color={COLORS.white} />
-              <Text style={styles.completeBtnText}>ব্যাচ কমপ্লিট করুন</Text>
-            </>
+            <TouchableOpacity
+              style={[styles.completeBtn, { backgroundColor: T.success }]}
+              onPress={tryComplete}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="checkmark-done-circle-outline" size={20} color="#fff" />
+              <Text style={styles.completeBtnText}>ব্যাচ বন্ধ করুন</Text>
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
-
-        <View style={{ height: 30 }} />
-      </ScrollView>
+        </View>
+      </Animated.ScrollView>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background, padding: 14 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  summaryCard: { backgroundColor: COLORS.primary, borderRadius: 12, padding: 16, marginBottom: 14 },
-  summaryTitle: { fontSize: 15, fontWeight: '800', color: COLORS.white, marginBottom: 10 },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 5 },
-  dueSummaryRow: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 6, paddingHorizontal: 8, marginTop: 4 },
-  summaryLabel: { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
-  summaryValue: { fontSize: 14, fontWeight: '700', color: COLORS.white },
-
-  card: { backgroundColor: COLORS.white, borderRadius: 12, padding: 16, marginBottom: 14 },
-  cardTitle: { fontSize: 15, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
-  cardSubtitle: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 14 },
-
-  expenseItem: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  expenseIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  expenseItemLabel: { flex: 1, fontSize: 13, fontWeight: '600', color: COLORS.text },
-  expenseInputWrapper: {
-    flexDirection: 'row', alignItems: 'center', borderWidth: 1.5,
-    borderColor: COLORS.border, borderRadius: 8, backgroundColor: COLORS.background,
+  // Hero
+  hero: { margin: 16, borderRadius: 18, borderWidth: 1, padding: 18 },
+  heroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
-  expenseInput: { width: 80, paddingVertical: 8, paddingHorizontal: 10, fontSize: 15, color: COLORS.text, textAlign: 'right' },
-  expenseSuffix: { paddingRight: 8, fontSize: 12, color: COLORS.textMuted, fontWeight: '700' },
-
-  customExpenseItem: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  customLabelInput: {
-    flex: 1, borderWidth: 1.5, borderColor: COLORS.border, borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: COLORS.text,
+  heroLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 4,
   },
-  addExpenseBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center',
-    borderWidth: 1.5, borderColor: COLORS.primary, borderRadius: 8, borderStyle: 'dashed',
-    padding: 10, marginTop: 6,
+  heroBatchNum: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  heroDate: { fontSize: 12, marginTop: 2 },
+  pendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  addExpenseBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: 13 },
+  pendingBadgeText: { fontSize: 11, fontWeight: '700' },
+  heroStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  heroStat: { flex: 1, minWidth: '45%', borderRadius: 12, padding: 12, gap: 4 },
+  heroStatLabel: { fontSize: 10 },
+  heroStatVal: { fontSize: 15, fontWeight: '900' },
 
-  totalsCard: { backgroundColor: COLORS.white, borderRadius: 12, padding: 16, marginBottom: 14, gap: 8 },
-  totalsTitle: { fontSize: 14, fontWeight: '800', color: COLORS.textSecondary, textTransform: 'uppercase', marginBottom: 6 },
-  totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
-  totalsLabel: { fontSize: 13, color: COLORS.textSecondary },
-  totalsValue: { fontSize: 15, fontWeight: '700' },
-  netProfitRow: {
-    borderTopWidth: 2, borderTopColor: COLORS.border, marginTop: 4, paddingTop: 10,
+  // Section
+  section: { paddingHorizontal: 16, marginBottom: 4 },
+  sectionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  netProfitLabel: { fontSize: 15, fontWeight: '800', color: COLORS.text },
-  netProfitValue: { fontSize: 22, fontWeight: '900' },
+  sectionTitle: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.7 },
+  addExpBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
+  addExpBtnText: { fontSize: 12, fontWeight: '700' },
 
+  // Add form
+  addForm: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 12,
+    overflow: 'hidden',
+    flexDirection: 'row',
+  },
+  formAccent: { width: 4 },
+  formBody: { flex: 1, padding: 14, gap: 10 },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 10 },
+  input: { flex: 1, padding: 11, fontSize: 14 },
+  inputSuffix: { paddingRight: 12, fontSize: 13, fontWeight: '700' },
+  catRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  catChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5 },
+  catChipText: { fontSize: 11 },
+  addFormBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 10,
+    paddingVertical: 12,
+  },
+  addFormBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+
+  // Expense list
+  expList: { gap: 8 },
+  emptyExp: { borderRadius: 14, borderWidth: 1, padding: 24, alignItems: 'center', gap: 8 },
+  emptyExpTitle: { fontSize: 14, fontWeight: '700' },
+  emptyExpSub: { fontSize: 12, textAlign: 'center' },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    marginTop: 4,
+  },
+  totalLabel: { fontSize: 13, fontWeight: '700' },
+  totalValue: { fontSize: 18, fontWeight: '900' },
+
+  // Profit card
+  profitCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 18,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  profitLabel: { fontSize: 11, marginBottom: 4 },
+  profitCalc: { fontSize: 12 },
+  profitValue: { fontSize: 26, fontWeight: '900', letterSpacing: -1 },
+
+  // Complete
+  cantComplete: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+  },
+  cantCompleteText: { flex: 1, fontSize: 13, fontWeight: '600' },
   completeBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: COLORS.success, borderRadius: 12, paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 16,
+    paddingVertical: 17,
   },
-  completeBtnText: { color: COLORS.white, fontWeight: '800', fontSize: 16 },
+  completeBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
 });

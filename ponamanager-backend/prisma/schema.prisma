@@ -134,12 +134,15 @@ model BatchOrder {
 }
 
 model BatchExpense {
-  id      String @id @default(cuid())
-  batchId String
-  label   String
-  amount  Float
+  id        String   @id @default(cuid())
+  batchId   String
+  label     String
+  amount    Float
+  category  String   @default("General")
+  notes     String?
+  createdAt DateTime @default(now())
 
-  batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batch Batch @relation(fields: [batchId], references: [id])
 }
 
 model Payment {

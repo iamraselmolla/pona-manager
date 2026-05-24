@@ -1,3 +1,3 @@
 * fix the day closing
 * খরচ যোগ করবার সমইয় ব্যাচ সিলেক্টের অপশন থাকতে হবে 
-* hisab বন্ধের বাটন কাজ করে না
+* company order e filter kaj korche na

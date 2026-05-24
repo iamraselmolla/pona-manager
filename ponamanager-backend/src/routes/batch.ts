@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authMiddleware } from '../middleware/auth';
 import dayjs from 'dayjs';
+import { appLogger, auditLogger } from '../../utils/logger';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -547,6 +548,133 @@ router.delete('/:id/company-order', async (req, res) => {
     res.json({ success: true });
   } catch (e: any) {
     res.status(500).json({ success: false, message: 'Failed to remove company order link' });
+  }
+});
+// ADD to src/routes/batch.ts
+
+// ── GET /:id/expenses — list expenses for a batch ──────────────────────────────
+router.get('/:id/expenses', async (req, res) => {
+  try {
+    const expenses = await prisma.batchExpense.findMany({
+      where: { batchId: req.params.id },
+      orderBy: { createdAt: 'asc' },
+    });
+    res.json({ success: true, data: expenses });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: 'Failed to fetch expenses' });
+  }
+});
+
+// ── POST /:id/expenses — add expense to batch ──────────────────────────────────
+router.post('/:id/expenses', async (req, res) => {
+  try {
+    const { label, amount, category = 'General', notes } = req.body;
+
+    if (!label || !amount) {
+      return res.status(400).json({ success: false, message: 'label and amount required' });
+    }
+
+    const batch = await prisma.batch.findUnique({ where: { id: req.params.id } });
+    if (!batch) return res.status(404).json({ success: false, message: 'Batch not found' });
+    if (batch.status === 'completed') {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Cannot add expense to completed batch' });
+    }
+
+    const expense = await prisma.$transaction(async (tx) => {
+      const exp = await tx.batchExpense.create({
+        data: { batchId: req.params.id, label, amount, category, notes },
+      });
+      // Update batch totalExpenses
+      await tx.batch.update({
+        where: { id: req.params.id },
+        data: { totalExpenses: { increment: amount } },
+      });
+      return exp;
+    });
+
+    res.status(201).json({ success: true, data: expense });
+  } catch (e: any) {
+    appLogger.error({ type: 'BATCH_EXPENSE_CREATE_FAILED', error: e.message });
+    res.status(500).json({ success: false, message: 'Failed to add expense' });
+  }
+});
+
+// ── DELETE /:id/expenses/:expenseId — remove expense ──────────────────────────
+router.delete('/:id/expenses/:expenseId', async (req, res) => {
+  try {
+    const expense = await prisma.batchExpense.findUnique({
+      where: { id: req.params.expenseId },
+    });
+    if (!expense) return res.status(404).json({ success: false, message: 'Not found' });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.batchExpense.delete({ where: { id: req.params.expenseId } });
+      await tx.batch.update({
+        where: { id: req.params.id },
+        data: { totalExpenses: { decrement: expense.amount } },
+      });
+    });
+
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: 'Failed to delete expense' });
+  }
+});
+
+// ── PATCH /:id/complete — close/complete a batch ───────────────────────────────
+router.patch('/:id/complete', async (req, res) => {
+  try {
+    const batch = await prisma.batch.findUnique({
+      where: { id: req.params.id },
+      include: { batchOrders: true, expenses: true },
+    });
+
+    if (!batch) return res.status(404).json({ success: false, message: 'Batch not found' });
+    if (batch.status === 'completed') {
+      return res.status(400).json({ success: false, message: 'Batch already completed' });
+    }
+
+    // Check all orders are delivered
+    const pendingOrders = batch.batchOrders.filter((o) => o.deliveryStatus === 'pending');
+    if (pendingOrders.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `${pendingOrders.length}টি ডেলিভারি বাকি আছে`,
+      });
+    }
+
+    const totalExpenses = batch.expenses.reduce((s, e) => s + e.amount, 0);
+    const totalCollected = batch.totalCollected;
+    const totalDue = batch.totalDue;
+    const totalProfit = totalCollected - totalExpenses;
+
+    await prisma.batch.update({
+      where: { id: req.params.id },
+      data: {
+        status: 'completed',
+        completedAt: new Date(),
+        totalExpenses,
+        totalProfit,
+      },
+    });
+
+    auditLogger.info({
+      action: 'BATCH_COMPLETED',
+      entity: 'Batch',
+      entityId: req.params.id,
+      after: { totalCollected, totalExpenses, totalProfit, totalDue },
+      req,
+    });
+
+    res.json({
+      success: true,
+      data: { totalCollected, totalExpenses, totalProfit, totalDue },
+    });
+  } catch (e: any) {
+    appLogger.error({ type: 'BATCH_COMPLETE_FAILED', error: e.message });
+    res.status(500).json({ success: false, message: 'Failed to complete batch' });
   }
 });
 
