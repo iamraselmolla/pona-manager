@@ -1,3 +1,22 @@
 * fix the day closing
 * খরচ যোগ করবার সমইয় ব্যাচ সিলেক্টের অপশন থাকতে হবে 
 * company order e filter kaj korche na
+
+bipul 10
+sadi 3
+liton 1
+anis 1
+miran 4
+hasan 8
+emdad 5
+
+
+
+
+----------------------
+
+
+
+
+sadi 8 * 1160
+bipul

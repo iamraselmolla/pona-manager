@@ -48,13 +48,12 @@ router.get('/', async (req, res) => {
 
     const orders = await prisma.companyOrder.findMany({
       where: {
-        ...(ponaType ? { ponaType: ponaType as string } : {}),
+        ...(ponaType ? { ponaType: String(ponaType) } : {}),
 
-        // 👇 SPECIAL CASE
         ...(status === 'notAssigned'
           ? { batchId: null }
           : status
-            ? { status: status as string }
+            ? { status: String(status) }
             : {}),
       },
       orderBy: { createdAt: 'desc' },

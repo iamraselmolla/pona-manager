@@ -2,7 +2,7 @@ import apiClient from './client';
 
 export const companyOrderAPI = {
   getAll: (params?: { status?: string; ponaType?: string }) =>
-    apiClient.get('/company-orders?status=notAssigned', { params }),
+    apiClient.get('/company-orders', { params }),
 
   getById: (id: string) => apiClient.get(`/company-orders/${id}`),
 

@@ -113,10 +113,26 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
+    const customer = await prisma.customer.findUnique({
+      where: { id: req.params.id },
+      include: { orders: true, payments: true },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ success: false, message: 'Customer not found' });
+    }
+
+    if (customer.orders.length > 0 || customer.payments.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete customer with existing orders or payments',
+      });
+    }
+
     await prisma.customer.delete({ where: { id: req.params.id } });
     res.json({ success: true });
-  } catch {
-    res.status(500).json({ success: false, message: 'Failed to delete' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to delete customer' });
   }
 });
 

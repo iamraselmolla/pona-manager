@@ -1,150 +1,3 @@
-// ─── Add Order To Batch Modal ────────────────────────────────────────────────
-const AddOrderToBatchModal = ({
-  visible,
-  batchId,
-  onClose,
-  onAdded,
-}: {
-  visible: boolean;
-  batchId: string;
-  onClose: () => void;
-  onAdded: () => void;
-}) => {
-  const T = useTheme();
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!visible) return;
-    setLoading(true);
-    orderAPI
-      .getAll({ status: 'pending', limit: 200 })
-      .then((res: any) => {
-        const raw = res?.data?.data?.data;
-        setOrders(Array.isArray(raw) ? raw : []);
-      })
-      .catch(() => setOrders([]))
-      .finally(() => setLoading(false));
-  }, [visible]);
-
-  const handleAdd = async (orderId: string) => {
-    setAdding(orderId);
-    try {
-      await batchAPI.addOrders(batchId, [orderId]);
-      toast.success('অর্ডার ব্যাচে যোগ হয়েছে');
-      onAdded();
-      onClose();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || 'যোগ ব্যর্থ');
-    } finally {
-      setAdding(null);
-    }
-  };
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <View style={[cStyles.container, { backgroundColor: T.bg }]}>
-        {/* Header */}
-        <View style={[cStyles.header, { backgroundColor: T.surface, borderBottomColor: T.border }]}>
-          <View style={[cStyles.headerBar, { backgroundColor: T.accent }]} />
-          <View style={cStyles.headerContent}>
-            <Text style={[cStyles.headerTitle, { color: T.textPrimary }]}>অর্ডার যোগ করুন</Text>
-            <Text style={[cStyles.headerSub, { color: T.textMuted }]}>
-              পেন্ডিং অর্ডার থেকে বেছে নিন
-            </Text>
-          </View>
-          <TouchableOpacity style={[cStyles.closeBtn, { backgroundColor: T.bg }]} onPress={onClose}>
-            <Ionicons name="close" size={20} color={T.textPrimary} />
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <View style={cStyles.center}>
-            <ActivityIndicator size="large" color={T.accent} />
-          </View>
-        ) : orders.length === 0 ? (
-          <View style={cStyles.center}>
-            <Ionicons name="list-outline" size={44} color={T.textMuted} />
-            <Text style={[cStyles.emptyText, { color: T.textMuted }]}>কোনো পেন্ডিং অর্ডার নেই</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={orders}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ padding: 16, gap: 10 }}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => {
-              const typeColor = getPonaTypeColor(item.ponaType) ?? T.accent;
-              const isAdding = adding === item.id;
-              return (
-                <View
-                  style={[
-                    cStyles.orderCard,
-                    {
-                      backgroundColor: T.surface,
-                      borderColor: T.border,
-                      borderLeftColor: typeColor,
-                    },
-                  ]}
-                >
-                  <View style={cStyles.orderCardTop}>
-                    <View style={[cStyles.ponaBadge, { backgroundColor: typeColor + '18' }]}>
-                      <Text style={[cStyles.ponaBadgeText, { color: typeColor }]}>
-                        {item.ponaType}
-                      </Text>
-                    </View>
-                    <Text style={[cStyles.orderDate, { color: T.textMuted }]}>
-                      {formatDate(item.orderDate)}
-                    </Text>
-                  </View>
-                  <View style={cStyles.orderStats}>
-                    <View style={cStyles.orderStat}>
-                      <Text style={[cStyles.orderStatLabel, { color: T.textMuted }]}>কাস্টমার</Text>
-                      <Text style={[cStyles.orderStatVal, { color: T.textPrimary }]}>
-                        {item.customerName}
-                      </Text>
-                    </View>
-                    <View style={[cStyles.orderStatDiv, { backgroundColor: T.border }]} />
-                    <View style={cStyles.orderStat}>
-                      <Text style={[cStyles.orderStatLabel, { color: T.textMuted }]}>পরিমাণ</Text>
-                      <Text style={[cStyles.orderStatVal, { color: T.textPrimary }]}>
-                        {item.plQuantity?.toLocaleString()} PL
-                      </Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={[
-                      cStyles.connectBtn,
-                      { backgroundColor: isAdding ? T.accent + '80' : T.accent },
-                    ]}
-                    onPress={() => handleAdd(item.id)}
-                    disabled={!!adding}
-                    activeOpacity={0.85}
-                  >
-                    {isAdding ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <>
-                        <Ionicons name="add-circle-outline" size={15} color="#fff" />
-                        <Text style={cStyles.connectBtnText}>এই ব্যাচে যোগ করুন</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              );
-            }}
-          />
-        )}
-      </View>
-    </Modal>
-  );
-};
 // src/screens/batch/BatchDetailsScreen.tsx
 import React, { useEffect, useState, useCallback } from 'react';
 import {
@@ -161,6 +14,7 @@ import {
   Platform,
   useColorScheme,
   FlatList,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -171,9 +25,9 @@ import { orderAPI } from '../../api/services';
 import { Batch, BatchOrder } from '../../types';
 import { formatCurrency, formatDate, getPonaTypeColor } from '../../utils/helpers';
 import { showConfirm } from '../../utils/AppModal';
-import Animated from 'react-native-reanimated';
+showConfirm;
 
-// ─── Theme ─────────────────────────────────────────────────────────────────────
+// ─── Theme ──────────────────────────────────────────────────────────────────────
 const LIGHT = {
   bg: '#F4F5F9',
   surface: '#FFFFFF',
@@ -194,7 +48,6 @@ const LIGHT = {
   infoSoft: 'rgba(14,165,233,0.10)',
   white: '#FFFFFF',
   inputBg: '#F4F5F9',
-  shadow: '#000',
 };
 const DARK = {
   bg: '#0F1117',
@@ -216,7 +69,6 @@ const DARK = {
   infoSoft: 'rgba(59,158,255,0.12)',
   white: '#FFFFFF',
   inputBg: '#0F1117',
-  shadow: '#000',
 };
 const useTheme = () => (useColorScheme() === 'dark' ? DARK : LIGHT);
 
@@ -236,19 +88,6 @@ const toast = {
     Toast.show({ type: 'error', text1: title, text2: msg, position: 'top', visibilityTime: 3000 }),
 };
 
-// ─── Confirm ────────────────────────────────────────────────────────────────────
-const confirm = (title: string, message: string, onConfirm: () => void) => {
-  if (typeof window !== 'undefined' && window.confirm) {
-    if (window.confirm(`${title}\n\n${message}`)) onConfirm();
-  } else {
-    const { Alert } = require('react-native');
-    Alert.alert(title, message, [
-      { text: 'না', style: 'cancel' },
-      { text: 'হ্যাঁ', style: 'destructive', onPress: onConfirm },
-    ]);
-  }
-};
-
 // ─── Status config ──────────────────────────────────────────────────────────────
 const getStatusConfig = (T: typeof LIGHT) => ({
   pending: { label: 'পেন্ডিং', color: T.warning, bg: T.warningSoft, icon: 'time-outline' as const },
@@ -258,11 +97,26 @@ const getStatusConfig = (T: typeof LIGHT) => ({
     bg: T.successSoft,
     icon: 'checkmark-circle-outline' as const,
   },
-  partial: { label: 'আংশিক', color: T.info, bg: T.infoSoft, icon: 'git-branch-outline' as const },
+  partial: {
+    label: 'সম্পন্ন',
+    color: T.success,
+    bg: T.successSoft,
+    icon: 'checkmark-circle-outline' as const,
+  },
 });
 
 // ─── Input field ────────────────────────────────────────────────────────────────
-const InputField = ({ label, value, onChange, suffix, placeholder, T, note, highlight }: any) => (
+const InputField = ({
+  label,
+  value,
+  onChange,
+  suffix,
+  placeholder,
+  T,
+  note,
+  highlight,
+  keyboardType = 'numeric',
+}: any) => (
   <View style={mStyles.field}>
     <Text style={[mStyles.fieldLabel, { color: highlight ? T.info : T.textSecondary }]}>
       {label}
@@ -278,7 +132,7 @@ const InputField = ({ label, value, onChange, suffix, placeholder, T, note, high
         style={[mStyles.input, { color: T.textPrimary }]}
         value={value}
         onChangeText={onChange}
-        keyboardType="numeric"
+        keyboardType={keyboardType}
         placeholder={placeholder ?? '0'}
         placeholderTextColor={T.textMuted}
       />
@@ -288,8 +142,8 @@ const InputField = ({ label, value, onChange, suffix, placeholder, T, note, high
 );
 
 // ─── Calc row ───────────────────────────────────────────────────────────────────
-const CalcRow = ({ label, value, color, T, bold, last }: any) => (
-  <View style={[mStyles.calcRow, { borderBottomColor: last ? 'transparent' : T.border }]}>
+const CalcRow = ({ label, value, color, T, bold }: any) => (
+  <View style={[mStyles.calcRow, { borderBottomColor: T.border }]}>
     <Text style={[mStyles.calcLabel, { color: T.textSecondary, fontWeight: bold ? '700' : '400' }]}>
       {label}
     </Text>
@@ -352,463 +206,7 @@ const MirCompare = ({ companyMir, ourMir, poly, T }: any) => {
   );
 };
 
-// ─── Connect Company Order Modal ────────────────────────────────────────────────
-const ConnectCompanyOrderModal = ({
-  visible,
-  batchId,
-  onClose,
-  onConnected,
-}: {
-  visible: boolean;
-  batchId: string;
-  onClose: () => void;
-  onConnected: () => void;
-}) => {
-  const T = useTheme();
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [connecting, setConnecting] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!visible) return;
-    setLoading(true);
-    companyOrderAPI
-      .getAll() // no status filter — show all
-      .then((res) => {
-        const raw = res?.data?.data;
-        setOrders(Array.isArray(raw) ? raw : []);
-      })
-      .catch(() => setOrders([]))
-      .finally(() => setLoading(false));
-  }, [visible]);
-  const handleConnect = async (companyOrderId: string) => {
-    setConnecting(companyOrderId);
-    try {
-      await batchAPI.linkCompanyOrder(batchId, companyOrderId);
-      toast.success('কোম্পানি অর্ডার কানেক্ট হয়েছে');
-      onConnected();
-      onClose();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || 'কানেক্ট ব্যর্থ');
-    } finally {
-      setConnecting(null);
-    }
-  };
-
-  const PONA_COLORS: Record<string, string> = {
-    Golda: '#F5A623',
-    Bagda: '#1E88E5',
-    Vannamei: '#43A047',
-  };
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <View style={[cStyles.container, { backgroundColor: T.bg }]}>
-        {/* Header */}
-        <View style={[cStyles.header, { backgroundColor: T.surface, borderBottomColor: T.border }]}>
-          <View style={[cStyles.headerBar, { backgroundColor: T.warning }]} />
-          <View style={cStyles.headerContent}>
-            <Text style={[cStyles.headerTitle, { color: T.textPrimary }]}>
-              কোম্পানি অর্ডার কানেক্ট
-            </Text>
-            <Text style={[cStyles.headerSub, { color: T.textMuted }]}>
-              পোনা পাওয়া গেছে এমন অর্ডার বেছে নিন
-            </Text>
-          </View>
-          <TouchableOpacity style={[cStyles.closeBtn, { backgroundColor: T.bg }]} onPress={onClose}>
-            <Ionicons name="close" size={20} color={T.textPrimary} />
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <View style={cStyles.center}>
-            <ActivityIndicator size="large" color={T.accent} />
-          </View>
-        ) : orders.length === 0 ? (
-          <View style={cStyles.center}>
-            <Ionicons name="business-outline" size={44} color={T.textMuted} />
-            <Text style={[cStyles.emptyText, { color: T.textMuted }]}>
-              কোনো delivered কোম্পানি অর্ডার নেই
-            </Text>
-            <Text style={[cStyles.emptySub, { color: T.textMuted }]}>
-              আগে কোম্পানি অর্ডার receive করুন
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={orders}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ padding: 16, gap: 10 }}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => {
-              const color = PONA_COLORS[item.ponaType] ?? T.accent;
-              const isConnecting = connecting === item.id;
-              return (
-                <View
-                  style={[
-                    cStyles.orderCard,
-                    { backgroundColor: T.surface, borderColor: T.border, borderLeftColor: color },
-                  ]}
-                >
-                  {/* Top */}
-                  <View style={cStyles.orderCardTop}>
-                    <View style={[cStyles.ponaBadge, { backgroundColor: color + '18' }]}>
-                      <Text style={[cStyles.ponaBadgeText, { color }]}>{item.ponaType}</Text>
-                    </View>
-                    <Text style={[cStyles.orderDate, { color: T.textMuted }]}>
-                      {formatDate(item.expectedDate)}
-                    </Text>
-                  </View>
-
-                  {/* Mir info */}
-                  {item.mirValue && (
-                    <View style={[cStyles.mirBox, { backgroundColor: T.infoSoft }]}>
-                      <Text style={[cStyles.mirBoxText, { color: T.info }]}>
-                        মীর: {item.mirValue} × পলি: {item.totalPoly} ={' '}
-                        {(item.totalPL ?? 0).toLocaleString()} PL
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Stats */}
-                  <View style={cStyles.orderStats}>
-                    <View style={cStyles.orderStat}>
-                      <Text style={[cStyles.orderStatLabel, { color: T.textMuted }]}>পেমেন্ট</Text>
-                      <Text style={[cStyles.orderStatVal, { color: T.textPrimary }]}>
-                        {formatCurrency(item.paymentAmount)}
-                      </Text>
-                    </View>
-                    <View style={[cStyles.orderStatDiv, { backgroundColor: T.border }]} />
-                    <View style={cStyles.orderStat}>
-                      <Text style={[cStyles.orderStatLabel, { color: T.textMuted }]}>দর/PL</Text>
-                      <Text style={[cStyles.orderStatVal, { color: T.textPrimary }]}>
-                        ৳{item.ratePerPL}
-                      </Text>
-                    </View>
-                    <View style={[cStyles.orderStatDiv, { backgroundColor: T.border }]} />
-                    <View style={cStyles.orderStat}>
-                      <Text style={[cStyles.orderStatLabel, { color: T.textMuted }]}>মোট PL</Text>
-                      <Text style={[cStyles.orderStatVal, { color }]}>
-                        {(item.totalPL ?? item.expectedPL ?? 0).toLocaleString()}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Net position */}
-                  {(item.netDue > 0 || item.netAdvance > 0) && (
-                    <View
-                      style={[
-                        cStyles.netChip,
-                        { backgroundColor: item.netDue > 0 ? T.dangerSoft : T.successSoft },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          cStyles.netChipText,
-                          { color: item.netDue > 0 ? T.danger : T.success },
-                        ]}
-                      >
-                        {item.netDue > 0
-                          ? `বাকি: ${formatCurrency(item.netDue)}`
-                          : `অগ্রীম: ${formatCurrency(item.netAdvance)}`}
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Connect button */}
-                  <TouchableOpacity
-                    style={[
-                      cStyles.connectBtn,
-                      { backgroundColor: isConnecting ? T.warning + '80' : T.warning },
-                    ]}
-                    onPress={() => handleConnect(item.id)}
-                    disabled={!!connecting}
-                    activeOpacity={0.85}
-                  >
-                    {isConnecting ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <>
-                        <Ionicons name="link-outline" size={15} color="#fff" />
-                        <Text style={cStyles.connectBtnText}>এই ব্যাচে কানেক্ট করুন</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              );
-            }}
-          />
-        )}
-      </View>
-    </Modal>
-  );
-};
-
-// ─── Company Order Summary Card ─────────────────────────────────────────────────
-const CompanyOrderSummary = ({
-  companyOrder,
-  batchOrders,
-  T,
-  onDisconnect,
-  onViewDetail,
-  navigation,
-}: any) => {
-  const totalOurMir = batchOrders?.reduce((s: number, o: any) => s + (o.ourMir ?? 0), 0) ?? 0;
-  const totalCompanyMir =
-    batchOrders?.reduce((s: number, o: any) => s + (o.companyMir ?? 0), 0) ?? 0;
-  const totalFish = batchOrders?.reduce((s: number, o: any) => s + (o.totalFish ?? 0), 0) ?? 0;
-  const totalMirDiff = totalCompanyMir - totalOurMir;
-
-  const color =
-    { Golda: '#F5A623', Bagda: '#1E88E5', Vannamei: '#43A047' }[companyOrder.ponaType as string] ??
-    T.accent;
-
-  return (
-    <View style={[styles.companyCard, { backgroundColor: T.surface, borderColor: T.border }]}>
-      {/* Header */}
-      <View style={[styles.companyCardHeader, { borderBottomColor: T.border }]}>
-        <View style={[styles.companyCardIcon, { backgroundColor: T.warningSoft }]}>
-          <Ionicons name="business-outline" size={16} color={T.warning} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.companyCardTitle, { color: T.textPrimary }]}>কোম্পানি অর্ডার</Text>
-          <Text style={[styles.companyCardSub, { color: T.textMuted }]}>
-            {companyOrder.ponaType}
-          </Text>
-          <View style={styles.companyMetaRow}>
-            <Text style={[styles.companyMetaText, { color: T.textSecondary }]}>
-              তারিখ: {formatDate(companyOrder.expectedDate)}
-            </Text>
-            <Text style={[styles.companyMetaText, { color: T.textSecondary }]}>
-              স্ট্যাটাস: {companyOrder.status === 'delivered' ? 'ডেলিভার্ড' : 'পেন্ডিং'}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.companyCardActions}>
-          <View
-            style={[
-              styles.companyStatusBadge,
-              {
-                backgroundColor:
-                  companyOrder.status === 'delivered' ? T.successSoft : T.warningSoft,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.companyStatusText,
-                {
-                  color: companyOrder.status === 'delivered' ? T.success : T.warning,
-                },
-              ]}
-            >
-              {companyOrder.status === 'delivered' ? 'পাওয়া গেছে' : 'অপেক্ষায়'}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.companyDisconnectBtn, { borderColor: T.border }]}
-            onPress={onDisconnect}
-          >
-            <Ionicons name="unlink-outline" size={13} color={T.danger} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Mir × Poly = Total PL */}
-      {companyOrder.mirValue > 0 && companyOrder.totalPoly > 0 && (
-        <View style={[styles.companyMirVisual, { backgroundColor: T.infoSoft }]}>
-          <View style={styles.companyMirItem}>
-            <Text style={[styles.companyMirNum, { color: T.info }]}>{companyOrder.mirValue}</Text>
-            <Text style={[styles.companyMirLabel, { color: T.textMuted }]}>মীর</Text>
-          </View>
-          <Text style={[styles.companyMirOp, { color: T.textMuted }]}>×</Text>
-          <View style={styles.companyMirItem}>
-            <Text style={[styles.companyMirNum, { color: T.info }]}>{companyOrder.totalPoly}</Text>
-            <Text style={[styles.companyMirLabel, { color: T.textMuted }]}>পলি</Text>
-          </View>
-          <Text style={[styles.companyMirOp, { color: T.textMuted }]}>=</Text>
-          <View style={styles.companyMirItem}>
-            <Text style={[styles.companyMirNumBig, { color: T.info }]}>
-              {(companyOrder.totalPL ?? 0).toLocaleString()}
-            </Text>
-            <Text style={[styles.companyMirLabel, { color: T.textMuted }]}>মোট PL</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Stats */}
-      <View style={styles.companyStatsRow}>
-        <View style={styles.companyStatItem}>
-          <Text style={[styles.companyStatLabel, { color: T.textMuted }]}>পেমেন্ট</Text>
-          <Text style={[styles.companyStatVal, { color: T.textPrimary }]}>
-            {formatCurrency(companyOrder.paymentAmount)}
-          </Text>
-        </View>
-        <View style={[styles.companyStatDiv, { backgroundColor: T.border }]} />
-        <View style={styles.companyStatItem}>
-          <Text style={[styles.companyStatLabel, { color: T.textMuted }]}>দর/PL</Text>
-          <Text style={[styles.companyStatVal, { color: T.textPrimary }]}>
-            ৳{companyOrder.ratePerPL}
-          </Text>
-        </View>
-        <View style={[styles.companyStatDiv, { backgroundColor: T.border }]} />
-        <View style={styles.companyStatItem}>
-          <Text style={[styles.companyStatLabel, { color: T.textMuted }]}>
-            {companyOrder.status === 'delivered' ? 'মোট দাম' : 'আনু. PL'}
-          </Text>
-          <Text style={[styles.companyStatVal, { color }]}>
-            {companyOrder.status === 'delivered'
-              ? formatCurrency(companyOrder.actualAmount ?? companyOrder.paymentAmount)
-              : `${(companyOrder.expectedPL ?? 0).toLocaleString()} PL`}
-          </Text>
-        </View>
-      </View>
-
-      {/* Net position */}
-      {companyOrder.status === 'delivered' && (
-        <View
-          style={[
-            styles.companyNetRow,
-            {
-              backgroundColor: companyOrder.netDue > 0 ? T.dangerSoft : T.successSoft,
-              marginHorizontal: 14,
-              marginBottom: 10,
-            },
-          ]}
-        >
-          <Ionicons
-            name={companyOrder.netDue > 0 ? 'alert-circle-outline' : 'checkmark-circle-outline'}
-            size={13}
-            color={companyOrder.netDue > 0 ? T.danger : T.success}
-          />
-          <Text
-            style={[
-              styles.companyNetLabel,
-              { color: companyOrder.netDue > 0 ? T.danger : T.success },
-            ]}
-          >
-            {companyOrder.netDue > 0
-              ? `কোম্পানিকে দিতে হবে: ${formatCurrency(companyOrder.netDue)}`
-              : companyOrder.netAdvance > 0
-                ? `কোম্পানি দেবে: ${formatCurrency(companyOrder.netAdvance)}`
-                : 'হিসাব ক্লিয়ার ✓'}
-          </Text>
-        </View>
-      )}
-
-      {/* Batch vs Company mir comparison */}
-      {totalOurMir > 0 && (
-        <>
-          <View style={[styles.companyDivider, { backgroundColor: T.border }]} />
-          <View style={{ paddingHorizontal: 14, paddingBottom: 4 }}>
-            <Text style={[styles.companyMirCompareTitle, { color: T.textMuted }]}>
-              ব্যাচ ডেলিভারি মীর তুলনা
-            </Text>
-          </View>
-          <View style={styles.companyMirCompareRow}>
-            <View style={styles.companyMirCompareItem}>
-              <Text style={[styles.companyMirCompareNum, { color: T.info }]}>
-                {totalCompanyMir.toLocaleString()}
-              </Text>
-              <Text style={[styles.companyMirCompareLabel, { color: T.textMuted }]}>
-                কোম্পানি মীর
-              </Text>
-            </View>
-            <View style={[styles.companyMirVsDot, { backgroundColor: T.border }]}>
-              <Text style={[styles.companyMirVsText, { color: T.textMuted }]}>VS</Text>
-            </View>
-            <View style={styles.companyMirCompareItem}>
-              <Text style={[styles.companyMirCompareNum, { color: T.accent }]}>
-                {totalOurMir.toLocaleString()}
-              </Text>
-              <Text style={[styles.companyMirCompareLabel, { color: T.textMuted }]}>
-                আমাদের মীর
-              </Text>
-            </View>
-          </View>
-
-          <View
-            style={[
-              styles.companyMirDiffBanner,
-              {
-                backgroundColor:
-                  totalMirDiff === 0
-                    ? T.successSoft
-                    : totalMirDiff > 0
-                      ? T.dangerSoft
-                      : T.warningSoft,
-                marginHorizontal: 14,
-                marginBottom: 12,
-              },
-            ]}
-          >
-            <Ionicons
-              name={
-                totalMirDiff === 0
-                  ? 'checkmark-circle'
-                  : totalMirDiff > 0
-                    ? 'arrow-up-circle'
-                    : 'arrow-down-circle'
-              }
-              size={13}
-              color={totalMirDiff === 0 ? T.success : totalMirDiff > 0 ? T.danger : T.warning}
-            />
-            <Text
-              style={[
-                styles.companyMirDiffText,
-                {
-                  color: totalMirDiff === 0 ? T.success : totalMirDiff > 0 ? T.danger : T.warning,
-                },
-              ]}
-            >
-              {totalMirDiff === 0
-                ? 'মীর সম্পূর্ণ মিলছে'
-                : totalMirDiff > 0
-                  ? `${Math.abs(totalMirDiff).toLocaleString()} PL বেশি (কোম্পানি)`
-                  : `${Math.abs(totalMirDiff).toLocaleString()} PL কম (কোম্পানি)`}
-            </Text>
-            {totalFish > 0 && (
-              <Text
-                style={[
-                  styles.companyTotalFish,
-                  {
-                    color: totalMirDiff === 0 ? T.success : totalMirDiff > 0 ? T.danger : T.warning,
-                  },
-                ]}
-              >
-                মোট: {totalFish.toLocaleString()} PL
-              </Text>
-            )}
-          </View>
-        </>
-      )}
-
-      {companyOrder.notes ? (
-        <View style={[styles.companyNotesBox, { backgroundColor: T.inputBg }]}>
-          <Text style={[styles.companyNotesTitle, { color: T.textSecondary }]}>নোট</Text>
-          <Text style={[styles.companyNotesText, { color: T.textPrimary }]}>
-            {companyOrder.notes}
-          </Text>
-        </View>
-      ) : null}
-      <TouchableOpacity
-        style={[styles.companyViewBtn, { borderTopColor: T.border }]}
-        onPress={onViewDetail}
-        activeOpacity={0.8}
-      >
-        <Text style={[styles.companyViewBtnText, { color: T.textSecondary }]}>বিস্তারিত দেখুন</Text>
-        <Ionicons name="chevron-forward" size={13} color={T.textMuted} />
-      </TouchableOpacity>
-    </View>
-  );
-};
-
-// ─── Delivery Modal ─────────────────────────────────────────────────────────────
+// ─── Delivery Modal ──────────────────────────────────────────────────────────────
 const DeliveryModal = ({
   visible,
   batchOrder,
@@ -833,8 +231,8 @@ const DeliveryModal = ({
   const [payment, setPayment] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
-  const [forcePartial, setForcePartial] = useState(false);
-  const [customRemaining, setCustomRemaining] = useState('');
+  const [isPartialMode, setIsPartialMode] = useState(false);
+  const [remainingQtyInput, setRemainingQtyInput] = useState('');
 
   useEffect(() => {
     if (batchOrder) {
@@ -847,8 +245,8 @@ const DeliveryModal = ({
       setPayment('');
       setDueDate('');
       setNotes('');
-      setForcePartial(false);
-      setCustomRemaining('');
+      setIsPartialMode(false);
+      setRemainingQtyInput('');
     }
   }, [batchOrder]);
 
@@ -861,33 +259,34 @@ const DeliveryModal = ({
   const cMir = parseFloat(companyMir) || 0;
   const oMir = parseFloat(ourMir) || 0;
   const poly = parseFloat(totalPoly) || 0;
-  const qty = parseFloat(deliveredQty) || 0;
   const rate = parseFloat(deliveryRate) || 0;
   const disc = parseFloat(discount) || 0;
   const paid = parseFloat(payment) || 0;
 
-  // If mir + poly provided → use ourMir × poly
-  const actualQty = oMir > 0 && poly > 0 ? oMir * poly : qty;
-  const autoRemain = Math.max(0, orderedQty - actualQty);
+  // Delivered qty — from mir×poly or manual input
+  const mirCalcQty = oMir > 0 && poly > 0 ? oMir * poly : 0;
+  const deliveredNum = mirCalcQty > 0 ? mirCalcQty : parseFloat(deliveredQty) || 0;
 
-  // Partial = switcher OR auto-detected
-  const isActPartial = forcePartial || (actualQty > 0 && actualQty < orderedQty);
-  const finalRemaining = customRemaining
-    ? Math.max(0, parseFloat(customRemaining) || autoRemain)
-    : autoRemain;
+  // Remaining — orderedQty - deliveredNum, editable
+  const autoRemaining = Math.max(0, orderedQty - deliveredNum);
+  const remainingNum = remainingQtyInput
+    ? Math.max(0, parseFloat(remainingQtyInput) || 0)
+    : autoRemaining;
 
-  const finalAmt = Math.max(0, actualQty * rate - disc);
-  const dueAmt = Math.max(0, finalAmt - advance - paid);
-  const pct = orderedQty > 0 ? Math.min((actualQty / orderedQty) * 100, 100) : 0;
+  // Payment
   const ourTotal = oMir * poly;
   const mirDiff = cMir * poly - ourTotal;
+  const finalAmt = Math.max(0, deliveredNum * rate - disc);
+  const totalPaid = advance + paid;
+  const dueAmt = Math.max(0, finalAmt - totalPaid);
+
+  // If partial mode and overpaid → carry to new order as advance
+  const advanceCarry = isPartialMode && totalPaid > finalAmt ? totalPaid - finalAmt : 0;
+
+  const pct = orderedQty > 0 ? Math.min((deliveredNum / orderedQty) * 100, 100) : 0;
 
   const handleSubmit = () => {
-    console.log({
-      actualQty,
-      rate,
-    });
-    if (!actualQty || actualQty <= 0) {
+    if (!deliveredNum || deliveredNum <= 0) {
       toast.warn('ডেলিভারি পরিমাণ দিন');
       return;
     }
@@ -895,34 +294,30 @@ const DeliveryModal = ({
       toast.warn('দর দিন');
       return;
     }
-    if (actualQty > orderedQty) {
-      toast.warn(`সর্বোচ্চ ${orderedQty} PL`);
-      return;
-    }
 
-    const msg = isActPartial
-      ? `${actualQty.toLocaleString()} PL ডেলিভারি হবে। বাকি ${finalRemaining.toLocaleString()} PL নতুন অর্ডার হবে।`
-      : `${actualQty.toLocaleString()} PL ডেলিভারি নিশ্চিত করুন?`;
+    const autoNote = isPartialMode
+      ? `[আংশিক ডেলিভারি] বাকি ${remainingNum.toLocaleString()} PL নতুন অর্ডার হয়েছে।${advanceCarry > 0 ? ` অগ্রীম ৳${advanceCarry.toLocaleString()} নতুন অর্ডারে যোগ হয়েছে।` : ''}${notes ? ' ' + notes : ''}`
+      : notes;
 
-    confirm(isActPartial ? 'আংশিক ডেলিভারি' : 'ডেলিভারি নিশ্চিত', msg, async () => {
-      await onSubmit({
-        deliveredQuantity: actualQty,
-        companyMir: cMir || undefined,
-        ourMir: oMir || undefined,
-        totalPoly: poly || undefined,
-        mirDiff: cMir && oMir && poly ? mirDiff : undefined,
-        totalFish: ourTotal || undefined,
-        deliveredPL: poly || undefined,
-        deliveryRate: rate,
-        discount: disc,
-        customerPayment: paid,
-        dueAmount: dueAmt,
-        duePaymentDate: dueAmt > 0 && dueDate ? dueDate : undefined,
-        finalAmount: finalAmt,
-        isPartial: isActPartial,
-        remainingQuantity: isActPartial ? finalRemaining : 0,
-        notes,
-      });
+    onSubmit({
+      deliveredQuantity: deliveredNum,
+      companyMir: cMir || undefined,
+      ourMir: oMir || undefined,
+      totalPoly: poly || undefined,
+      mirDiff: cMir && oMir && poly ? mirDiff : undefined,
+      totalFish: ourTotal || undefined,
+      deliveredPL: poly || undefined,
+      deliveryRate: rate,
+      discount: disc,
+      customerPayment: paid,
+      dueAmount: dueAmt,
+      duePaymentDate: dueAmt > 0 && dueDate ? dueDate : undefined,
+      finalAmount: finalAmt,
+      // always delivered status — partial is just a flag
+      isPartial: isPartialMode,
+      remainingQuantity: isPartialMode ? remainingNum : 0,
+      advanceCarryOver: advanceCarry,
+      notes: autoNote,
     });
   };
 
@@ -938,7 +333,7 @@ const DeliveryModal = ({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={[mStyles.container, { backgroundColor: T.bg }]}>
-          {/* ── Header ── */}
+          {/* Header */}
           <View
             style={[mStyles.header, { backgroundColor: T.surface, borderBottomColor: T.border }]}
           >
@@ -962,7 +357,7 @@ const DeliveryModal = ({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* ── Order info ── */}
+            {/* Order info */}
             <View
               style={[mStyles.infoCard, { backgroundColor: T.surface, borderTopColor: typeColor }]}
             >
@@ -996,15 +391,12 @@ const DeliveryModal = ({
               ))}
             </View>
 
-            {/* ── Mir section ── */}
+            {/* Mir section */}
             <View style={[mStyles.sectionCard, { backgroundColor: T.surface }]}>
               <View style={mStyles.sectionTitleRow}>
                 <View style={[mStyles.sectionTitleDot, { backgroundColor: T.info }]} />
                 <Text style={[mStyles.sectionTitle, { color: T.textMuted }]}>মীর তথ্য</Text>
               </View>
-              <Text style={[mStyles.sectionDesc, { color: T.textMuted }]}>
-                কোম্পানির মীর ও আমাদের গণনা আলাদাভাবে লিখুন
-              </Text>
               <InputField
                 label="কোম্পানির মীর"
                 value={companyMir}
@@ -1040,14 +432,14 @@ const DeliveryModal = ({
               <MirCompare companyMir={cMir} ourMir={oMir} poly={poly} T={T} />
             </View>
 
-            {/* ── Quantity section ── */}
+            {/* Quantity section */}
             <View style={[mStyles.sectionCard, { backgroundColor: T.surface }]}>
               <View style={mStyles.sectionTitleRow}>
                 <View style={[mStyles.sectionTitleDot, { backgroundColor: typeColor }]} />
                 <Text style={[mStyles.sectionTitle, { color: T.textMuted }]}>ডেলিভারি পরিমাণ</Text>
               </View>
 
-              {oMir > 0 && poly > 0 && (
+              {mirCalcQty > 0 && (
                 <View style={[mStyles.autoFillNote, { backgroundColor: T.accentSoft }]}>
                   <Ionicons name="information-circle" size={13} color={T.accent} />
                   <Text style={[mStyles.autoFillText, { color: T.accent }]}>
@@ -1058,21 +450,23 @@ const DeliveryModal = ({
 
               <InputField
                 label="ডেলিভারিকৃত পরিমাণ (PL)"
-                value={deliveredQty}
-                onChange={setDeliveredQty}
+                value={mirCalcQty > 0 ? mirCalcQty.toString() : deliveredQty}
+                onChange={(v: string) => {
+                  if (mirCalcQty === 0) setDeliveredQty(v);
+                }}
                 suffix="PL"
                 placeholder={`সর্বোচ্চ ${orderedQty.toLocaleString()}`}
                 T={T}
               />
 
-              {/* Progress bar */}
-              {actualQty > 0 && (
+              {/* Progress */}
+              {deliveredNum > 0 && (
                 <View style={mStyles.progressWrap}>
                   <View style={[mStyles.progressBg, { backgroundColor: T.border }]}>
                     <View
                       style={[
                         mStyles.progressFill,
-                        { width: `${pct}%`, backgroundColor: isActPartial ? T.warning : T.success },
+                        { width: `${pct}%`, backgroundColor: T.success },
                       ]}
                     />
                   </View>
@@ -1082,18 +476,18 @@ const DeliveryModal = ({
                 </View>
               )}
 
-              {/* ── Partial switcher ── */}
+              {/* Partial switcher */}
               <TouchableOpacity
                 style={[
                   mStyles.partialSwitcher,
                   {
-                    backgroundColor: forcePartial ? T.infoSoft : T.inputBg,
-                    borderColor: forcePartial ? T.info + '60' : T.border,
+                    backgroundColor: isPartialMode ? T.infoSoft : T.inputBg,
+                    borderColor: isPartialMode ? T.info + '60' : T.border,
                   },
                 ]}
                 onPress={() => {
-                  setForcePartial(!forcePartial);
-                  setCustomRemaining('');
+                  setIsPartialMode(!isPartialMode);
+                  setRemainingQtyInput('');
                 }}
                 activeOpacity={0.8}
               >
@@ -1102,21 +496,21 @@ const DeliveryModal = ({
                     আংশিক ডেলিভারি
                   </Text>
                   <Text style={[mStyles.partialSwitcherSub, { color: T.textMuted }]}>
-                    চালু হলে বাকি PL নতুন অর্ডার হবে
+                    চালু হলে বাকি PL নতুন pending অর্ডার হবে
                   </Text>
                 </View>
                 <View
                   style={[
                     mStyles.switchTrack,
-                    { backgroundColor: forcePartial ? T.info : T.border },
+                    { backgroundColor: isPartialMode ? T.info : T.border },
                   ]}
                 >
-                  <Animated.View style={[mStyles.switchThumb, { left: forcePartial ? 20 : 2 }]} />
+                  <View style={[mStyles.switchThumb, { left: isPartialMode ? 20 : 2 }]} />
                 </View>
               </TouchableOpacity>
 
-              {/* Remaining qty — editable */}
-              {isActPartial && (
+              {/* Remaining — shown only in partial mode */}
+              {isPartialMode && (
                 <View
                   style={[
                     mStyles.remainingBox,
@@ -1128,25 +522,31 @@ const DeliveryModal = ({
                       বাকি PL (নতুন অর্ডার)
                     </Text>
                     <Text style={[mStyles.remainingAuto, { color: T.textMuted }]}>
-                      {orderedQty} − {actualQty.toFixed(0)} = {autoRemain.toFixed(0)} PL
+                      {orderedQty} − {deliveredNum.toFixed(0)} = {autoRemaining.toFixed(0)} PL
+                      (ডিফল্ট)
                     </Text>
+                    {advanceCarry > 0 && (
+                      <Text style={[mStyles.remainingAuto, { color: T.success, marginTop: 2 }]}>
+                        অগ্রীম ৳{advanceCarry.toLocaleString()} নতুন অর্ডারে যাবে
+                      </Text>
+                    )}
                   </View>
                   <TextInput
                     style={[
                       mStyles.remainingInput,
                       { borderColor: T.info + '60', color: T.info, backgroundColor: T.inputBg },
                     ]}
-                    value={customRemaining}
-                    onChangeText={setCustomRemaining}
+                    value={remainingQtyInput}
+                    onChangeText={setRemainingQtyInput}
                     keyboardType="numeric"
-                    placeholder={autoRemain.toString()}
+                    placeholder={autoRemaining.toString()}
                     placeholderTextColor={T.info + '80'}
                   />
                 </View>
               )}
             </View>
 
-            {/* ── Payment section ── */}
+            {/* Payment section */}
             <View style={[mStyles.sectionCard, { backgroundColor: T.surface }]}>
               <View style={mStyles.sectionTitleRow}>
                 <View style={[mStyles.sectionTitleDot, { backgroundColor: T.success }]} />
@@ -1183,19 +583,20 @@ const DeliveryModal = ({
                   placeholder="YYYY-MM-DD"
                   T={T}
                   note="কবে বাকি দেবে"
+                  keyboardType="default"
                 />
               )}
             </View>
 
-            {/* ── Summary ── */}
+            {/* Summary */}
             <View style={[mStyles.sectionCard, { backgroundColor: T.surface }]}>
               <View style={mStyles.sectionTitleRow}>
                 <View style={[mStyles.sectionTitleDot, { backgroundColor: T.warning }]} />
                 <Text style={[mStyles.sectionTitle, { color: T.textMuted }]}>হিসাব সারসংক্ষেপ</Text>
               </View>
               <CalcRow
-                label={`${actualQty.toLocaleString()} PL × ৳${rate}`}
-                value={formatCurrency(actualQty * rate)}
+                label={`${deliveredNum.toLocaleString()} PL × ৳${rate}`}
+                value={formatCurrency(deliveredNum * rate)}
                 T={T}
               />
               {disc > 0 && (
@@ -1206,13 +607,16 @@ const DeliveryModal = ({
                 value={formatCurrency(finalAmt)}
                 color={T.accent}
                 T={T}
+                bold
               />
-              <CalcRow
-                label="আগাম জমা"
-                value={`- ${formatCurrency(advance)}`}
-                color={T.success}
-                T={T}
-              />
+              {advance > 0 && (
+                <CalcRow
+                  label="আগাম জমা"
+                  value={`- ${formatCurrency(advance)}`}
+                  color={T.success}
+                  T={T}
+                />
+              )}
               {paid > 0 && (
                 <CalcRow
                   label="আজকের পেমেন্ট"
@@ -1234,7 +638,7 @@ const DeliveryModal = ({
                   {formatCurrency(dueAmt)}
                 </Text>
               </View>
-              {isActPartial && finalRemaining > 0 && (
+              {isPartialMode && (
                 <View
                   style={[
                     mStyles.calcRow,
@@ -1243,18 +647,19 @@ const DeliveryModal = ({
                       borderRadius: 8,
                       paddingHorizontal: 10,
                       borderBottomColor: 'transparent',
+                      marginTop: 6,
                     },
                   ]}
                 >
                   <Text style={[mStyles.calcLabel, { color: T.info }]}>নতুন অর্ডার (বাকি PL)</Text>
                   <Text style={[mStyles.calcVal, { color: T.info, fontWeight: '800' }]}>
-                    {finalRemaining.toLocaleString()} PL
+                    {remainingNum.toLocaleString()} PL
                   </Text>
                 </View>
               )}
             </View>
 
-            {/* ── Notes ── */}
+            {/* Notes */}
             <View style={[mStyles.sectionCard, { backgroundColor: T.surface }]}>
               <Text style={[mStyles.fieldLabel, { color: T.textSecondary }]}>নোট</Text>
               <TextInput
@@ -1273,7 +678,7 @@ const DeliveryModal = ({
             <View style={{ height: 20 }} />
           </ScrollView>
 
-          {/* ── Submit ── */}
+          {/* Submit */}
           <View style={[mStyles.footer, { backgroundColor: T.surface, borderTopColor: T.border }]}>
             <TouchableOpacity
               style={[
@@ -1288,13 +693,9 @@ const DeliveryModal = ({
                 <ActivityIndicator color="#fff" />
               ) : (
                 <View style={mStyles.submitBtnInner}>
-                  <Ionicons
-                    name={isActPartial ? 'git-branch-outline' : 'checkmark-circle'}
-                    size={20}
-                    color="#fff"
-                  />
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
                   <Text style={mStyles.submitBtnText}>
-                    {isActPartial ? 'আংশিক ডেলিভারি নিশ্চিত' : 'ডেলিভারি নিশ্চিত করুন'}
+                    {isPartialMode ? 'ডেলিভারি ও নতুন অর্ডার তৈরি' : 'ডেলিভারি নিশ্চিত করুন'}
                   </Text>
                 </View>
               )}
@@ -1306,7 +707,541 @@ const DeliveryModal = ({
   );
 };
 
-// ─── Batch Order Row ────────────────────────────────────────────────────────────
+// ─── Connect Company Order Modal ─────────────────────────────────────────────────
+const ConnectCompanyOrderModal = ({
+  visible,
+  batchId,
+  onClose,
+  onConnected,
+}: {
+  visible: boolean;
+  batchId: string;
+  onClose: () => void;
+  onConnected: () => void;
+}) => {
+  const T = useTheme();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    setLoading(true);
+    companyOrderAPI
+      .getAll()
+      .then((res) => {
+        const raw = res?.data?.data;
+        setOrders(Array.isArray(raw) ? raw : []);
+      })
+      .catch(() => setOrders([]))
+      .finally(() => setLoading(false));
+  }, [visible]);
+
+  const handleConnect = async (id: string) => {
+    setConnecting(id);
+    try {
+      await batchAPI.linkCompanyOrder(batchId, id);
+      toast.success('কোম্পানি অর্ডার কানেক্ট হয়েছে');
+      onConnected();
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'কানেক্ট ব্যর্থ');
+    } finally {
+      setConnecting(null);
+    }
+  };
+
+  const PONA_COLORS: Record<string, string> = {
+    Golda: '#F5A623',
+    Bagda: '#1E88E5',
+    Vannamei: '#43A047',
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={[cStyles.container, { backgroundColor: T.bg }]}>
+        <View style={[cStyles.header, { backgroundColor: T.surface, borderBottomColor: T.border }]}>
+          <View style={[cStyles.headerBar, { backgroundColor: T.warning }]} />
+          <View style={cStyles.headerContent}>
+            <Text style={[cStyles.headerTitle, { color: T.textPrimary }]}>
+              কোম্পানি অর্ডার কানেক্ট
+            </Text>
+            <Text style={[cStyles.headerSub, { color: T.textMuted }]}>অর্ডার বেছে নিন</Text>
+          </View>
+          <TouchableOpacity style={[cStyles.closeBtn, { backgroundColor: T.bg }]} onPress={onClose}>
+            <Ionicons name="close" size={20} color={T.textPrimary} />
+          </TouchableOpacity>
+        </View>
+        {loading ? (
+          <View style={cStyles.center}>
+            <ActivityIndicator size="large" color={T.accent} />
+          </View>
+        ) : orders.length === 0 ? (
+          <View style={cStyles.center}>
+            <Ionicons name="business-outline" size={44} color={T.textMuted} />
+            <Text style={[cStyles.emptyText, { color: T.textMuted }]}>
+              কোনো কোম্পানি অর্ডার নেই
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={orders}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ padding: 16, gap: 10 }}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => {
+              const color = PONA_COLORS[item.ponaType] ?? T.accent;
+              const isConn = connecting === item.id;
+              return (
+                <View
+                  style={[
+                    cStyles.orderCard,
+                    { backgroundColor: T.surface, borderColor: T.border, borderLeftColor: color },
+                  ]}
+                >
+                  <View style={cStyles.orderCardTop}>
+                    <View style={[cStyles.ponaBadge, { backgroundColor: color + '18' }]}>
+                      <Text style={[cStyles.ponaBadgeText, { color }]}>{item.ponaType}</Text>
+                    </View>
+                    <Text style={[cStyles.orderDate, { color: T.textMuted }]}>
+                      {formatDate(item.expectedDate)}
+                    </Text>
+                  </View>
+                  {item.mirValue && (
+                    <View style={[cStyles.mirBox, { backgroundColor: T.infoSoft }]}>
+                      <Text style={[cStyles.mirBoxText, { color: T.info }]}>
+                        মীর: {item.mirValue} × পলি: {item.totalPoly} ={' '}
+                        {(item.totalPL ?? 0).toLocaleString()} PL
+                      </Text>
+                    </View>
+                  )}
+                  <View style={cStyles.orderStats}>
+                    <View style={cStyles.orderStat}>
+                      <Text style={[cStyles.orderStatLabel, { color: T.textMuted }]}>পেমেন্ট</Text>
+                      <Text style={[cStyles.orderStatVal, { color: T.textPrimary }]}>
+                        {formatCurrency(item.paymentAmount)}
+                      </Text>
+                    </View>
+                    <View style={[cStyles.orderStatDiv, { backgroundColor: T.border }]} />
+                    <View style={cStyles.orderStat}>
+                      <Text style={[cStyles.orderStatLabel, { color: T.textMuted }]}>দর/PL</Text>
+                      <Text style={[cStyles.orderStatVal, { color: T.textPrimary }]}>
+                        ৳{item.ratePerPL}
+                      </Text>
+                    </View>
+                    <View style={[cStyles.orderStatDiv, { backgroundColor: T.border }]} />
+                    <View style={cStyles.orderStat}>
+                      <Text style={[cStyles.orderStatLabel, { color: T.textMuted }]}>মোট PL</Text>
+                      <Text style={[cStyles.orderStatVal, { color }]}>
+                        {(item.totalPL ?? item.expectedPL ?? 0).toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      cStyles.connectBtn,
+                      { backgroundColor: isConn ? T.warning + '80' : T.warning },
+                    ]}
+                    onPress={() => handleConnect(item.id)}
+                    disabled={!!connecting}
+                    activeOpacity={0.85}
+                  >
+                    {isConn ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="link-outline" size={15} color="#fff" />
+                        <Text style={cStyles.connectBtnText}>এই ব্যাচে কানেক্ট করুন</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              );
+            }}
+          />
+        )}
+      </View>
+    </Modal>
+  );
+};
+
+// ─── Add Order To Batch Modal ────────────────────────────────────────────────────
+const AddOrderToBatchModal = ({
+  visible,
+  batchId,
+  onClose,
+  onAdded,
+}: {
+  visible: boolean;
+  batchId: string;
+  onClose: () => void;
+  onAdded: () => void;
+}) => {
+  const T = useTheme();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    setLoading(true);
+    orderAPI
+      .getAll({ status: 'pending', limit: 200 })
+      .then((res: any) => {
+        const raw = res?.data?.data?.data;
+        setOrders(Array.isArray(raw) ? raw : []);
+      })
+      .catch(() => setOrders([]))
+      .finally(() => setLoading(false));
+  }, [visible]);
+
+  const handleAdd = async (orderId: string) => {
+    setAdding(orderId);
+    try {
+      await batchAPI.addOrderToBatch(batchId, orderId);
+      toast.success('অর্ডার ব্যাচে যোগ হয়েছে');
+      onAdded();
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'যোগ ব্যর্থ');
+    } finally {
+      setAdding(null);
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={[cStyles.container, { backgroundColor: T.bg }]}>
+        <View style={[cStyles.header, { backgroundColor: T.surface, borderBottomColor: T.border }]}>
+          <View style={[cStyles.headerBar, { backgroundColor: T.accent }]} />
+          <View style={cStyles.headerContent}>
+            <Text style={[cStyles.headerTitle, { color: T.textPrimary }]}>অর্ডার যোগ করুন</Text>
+            <Text style={[cStyles.headerSub, { color: T.textMuted }]}>
+              পেন্ডিং অর্ডার থেকে বেছে নিন
+            </Text>
+          </View>
+          <TouchableOpacity style={[cStyles.closeBtn, { backgroundColor: T.bg }]} onPress={onClose}>
+            <Ionicons name="close" size={20} color={T.textPrimary} />
+          </TouchableOpacity>
+        </View>
+        {loading ? (
+          <View style={cStyles.center}>
+            <ActivityIndicator size="large" color={T.accent} />
+          </View>
+        ) : orders.length === 0 ? (
+          <View style={cStyles.center}>
+            <Ionicons name="list-outline" size={44} color={T.textMuted} />
+            <Text style={[cStyles.emptyText, { color: T.textMuted }]}>কোনো পেন্ডিং অর্ডার নেই</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={orders}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ padding: 16, gap: 10 }}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => {
+              const typeColor = getPonaTypeColor(item.ponaType) ?? T.accent;
+              const isAdding = adding === item.id;
+              return (
+                <View
+                  style={[
+                    cStyles.orderCard,
+                    {
+                      backgroundColor: T.surface,
+                      borderColor: T.border,
+                      borderLeftColor: typeColor,
+                    },
+                  ]}
+                >
+                  <View style={cStyles.orderCardTop}>
+                    <View style={[cStyles.ponaBadge, { backgroundColor: typeColor + '18' }]}>
+                      <Text style={[cStyles.ponaBadgeText, { color: typeColor }]}>
+                        {item.ponaType}
+                      </Text>
+                    </View>
+                    <Text style={[cStyles.orderDate, { color: T.textMuted }]}>
+                      {formatDate(item.deliveryDate)}
+                    </Text>
+                  </View>
+                  <View style={cStyles.orderStats}>
+                    <View style={cStyles.orderStat}>
+                      <Text style={[cStyles.orderStatLabel, { color: T.textMuted }]}>কাস্টমার</Text>
+                      <Text style={[cStyles.orderStatVal, { color: T.textPrimary }]}>
+                        {item.customerName}
+                      </Text>
+                    </View>
+                    <View style={[cStyles.orderStatDiv, { backgroundColor: T.border }]} />
+                    <View style={cStyles.orderStat}>
+                      <Text style={[cStyles.orderStatLabel, { color: T.textMuted }]}>পরিমাণ</Text>
+                      <Text style={[cStyles.orderStatVal, { color: T.textPrimary }]}>
+                        {item.plQuantity?.toLocaleString()} PL
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      cStyles.connectBtn,
+                      { backgroundColor: isAdding ? T.accent + '80' : T.accent },
+                    ]}
+                    onPress={() => handleAdd(item.id)}
+                    disabled={!!adding}
+                    activeOpacity={0.85}
+                  >
+                    {isAdding ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="add-circle-outline" size={15} color="#fff" />
+                        <Text style={cStyles.connectBtnText}>এই ব্যাচে যোগ করুন</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              );
+            }}
+          />
+        )}
+      </View>
+    </Modal>
+  );
+};
+
+// ─── Company Order Summary ────────────────────────────────────────────────────────
+const CompanyOrderSummary = ({ companyOrder, batchOrders, T, onDisconnect, onViewDetail }: any) => {
+  const totalOurMir = batchOrders?.reduce((s: number, o: any) => s + (o.ourMir ?? 0), 0) ?? 0;
+  const totalCompanyMir =
+    batchOrders?.reduce((s: number, o: any) => s + (o.companyMir ?? 0), 0) ?? 0;
+  const totalFish = batchOrders?.reduce((s: number, o: any) => s + (o.totalFish ?? 0), 0) ?? 0;
+  const totalMirDiff = totalCompanyMir - totalOurMir;
+  const color =
+    ({ Golda: '#F5A623', Bagda: '#1E88E5', Vannamei: '#43A047' } as any)[companyOrder.ponaType] ??
+    T.accent;
+
+  return (
+    <View style={[styles.companyCard, { backgroundColor: T.surface, borderColor: T.border }]}>
+      <View style={[styles.companyCardHeader, { borderBottomColor: T.border }]}>
+        <View style={[styles.companyCardIcon, { backgroundColor: T.warningSoft }]}>
+          <Ionicons name="business-outline" size={16} color={T.warning} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.companyCardTitle, { color: T.textPrimary }]}>কোম্পানি অর্ডার</Text>
+          <Text style={[styles.companyCardSub, { color: T.textMuted }]}>
+            {companyOrder.ponaType} · {formatDate(companyOrder.expectedDate)}
+          </Text>
+        </View>
+        <View style={styles.companyCardActions}>
+          <View
+            style={[
+              styles.companyStatusBadge,
+              {
+                backgroundColor:
+                  companyOrder.status === 'delivered' ? T.successSoft : T.warningSoft,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.companyStatusText,
+                { color: companyOrder.status === 'delivered' ? T.success : T.warning },
+              ]}
+            >
+              {companyOrder.status === 'delivered' ? 'পাওয়া গেছে' : 'অপেক্ষায়'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.companyDisconnectBtn, { borderColor: T.border }]}
+            onPress={onDisconnect}
+          >
+            <Ionicons name="unlink-outline" size={13} color={T.danger} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {companyOrder.mirValue > 0 && companyOrder.totalPoly > 0 && (
+        <View style={[styles.companyMirVisual, { backgroundColor: T.infoSoft }]}>
+          <View style={styles.companyMirItem}>
+            <Text style={[styles.companyMirNum, { color: T.info }]}>{companyOrder.mirValue}</Text>
+            <Text style={[styles.companyMirLabel, { color: T.textMuted }]}>মীর</Text>
+          </View>
+          <Text style={[styles.companyMirOp, { color: T.textMuted }]}>×</Text>
+          <View style={styles.companyMirItem}>
+            <Text style={[styles.companyMirNum, { color: T.info }]}>{companyOrder.totalPoly}</Text>
+            <Text style={[styles.companyMirLabel, { color: T.textMuted }]}>পলি</Text>
+          </View>
+          <Text style={[styles.companyMirOp, { color: T.textMuted }]}>=</Text>
+          <View style={styles.companyMirItem}>
+            <Text style={[styles.companyMirNumBig, { color: T.info }]}>
+              {(companyOrder.totalPL ?? 0).toLocaleString()}
+            </Text>
+            <Text style={[styles.companyMirLabel, { color: T.textMuted }]}>মোট PL</Text>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.companyStatsRow}>
+        <View style={styles.companyStatItem}>
+          <Text style={[styles.companyStatLabel, { color: T.textMuted }]}>পেমেন্ট</Text>
+          <Text style={[styles.companyStatVal, { color: T.textPrimary }]}>
+            {formatCurrency(companyOrder.paymentAmount)}
+          </Text>
+        </View>
+        <View style={[styles.companyStatDiv, { backgroundColor: T.border }]} />
+        <View style={styles.companyStatItem}>
+          <Text style={[styles.companyStatLabel, { color: T.textMuted }]}>দর/PL</Text>
+          <Text style={[styles.companyStatVal, { color: T.textPrimary }]}>
+            ৳{companyOrder.ratePerPL}
+          </Text>
+        </View>
+        <View style={[styles.companyStatDiv, { backgroundColor: T.border }]} />
+        <View style={styles.companyStatItem}>
+          <Text style={[styles.companyStatLabel, { color: T.textMuted }]}>
+            {companyOrder.status === 'delivered' ? 'মোট দাম' : 'আনু. PL'}
+          </Text>
+          <Text style={[styles.companyStatVal, { color }]}>
+            {companyOrder.status === 'delivered'
+              ? formatCurrency(companyOrder.actualAmount ?? companyOrder.paymentAmount)
+              : `${(companyOrder.expectedPL ?? 0).toLocaleString()} PL`}
+          </Text>
+        </View>
+      </View>
+
+      {companyOrder.status === 'delivered' && (
+        <View
+          style={[
+            styles.companyNetRow,
+            {
+              backgroundColor: companyOrder.netDue > 0 ? T.dangerSoft : T.successSoft,
+              marginHorizontal: 14,
+              marginBottom: 10,
+            },
+          ]}
+        >
+          <Ionicons
+            name={companyOrder.netDue > 0 ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+            size={13}
+            color={companyOrder.netDue > 0 ? T.danger : T.success}
+          />
+          <Text
+            style={[
+              styles.companyNetLabel,
+              { color: companyOrder.netDue > 0 ? T.danger : T.success },
+            ]}
+          >
+            {companyOrder.netDue > 0
+              ? `কোম্পানিকে দিতে হবে: ${formatCurrency(companyOrder.netDue)}`
+              : companyOrder.netAdvance > 0
+                ? `কোম্পানি দেবে: ${formatCurrency(companyOrder.netAdvance)}`
+                : 'হিসাব ক্লিয়ার ✓'}
+          </Text>
+        </View>
+      )}
+
+      {totalOurMir > 0 && (
+        <>
+          <View style={[styles.companyDivider, { backgroundColor: T.border }]} />
+          <View style={{ paddingHorizontal: 14, paddingBottom: 4 }}>
+            <Text style={[styles.companyMirCompareTitle, { color: T.textMuted }]}>
+              ব্যাচ ডেলিভারি মীর তুলনা
+            </Text>
+          </View>
+          <View style={styles.companyMirCompareRow}>
+            <View style={styles.companyMirCompareItem}>
+              <Text style={[styles.companyMirCompareNum, { color: T.info }]}>
+                {totalCompanyMir.toLocaleString()}
+              </Text>
+              <Text style={[styles.companyMirCompareLabel, { color: T.textMuted }]}>
+                কোম্পানি মীর
+              </Text>
+            </View>
+            <View style={[styles.companyMirVsDot, { backgroundColor: T.border }]}>
+              <Text style={[styles.companyMirVsText, { color: T.textMuted }]}>VS</Text>
+            </View>
+            <View style={styles.companyMirCompareItem}>
+              <Text style={[styles.companyMirCompareNum, { color: T.accent }]}>
+                {totalOurMir.toLocaleString()}
+              </Text>
+              <Text style={[styles.companyMirCompareLabel, { color: T.textMuted }]}>
+                আমাদের মীর
+              </Text>
+            </View>
+          </View>
+          <View
+            style={[
+              styles.companyMirDiffBanner,
+              {
+                backgroundColor:
+                  totalMirDiff === 0
+                    ? T.successSoft
+                    : totalMirDiff > 0
+                      ? T.dangerSoft
+                      : T.warningSoft,
+                marginHorizontal: 14,
+                marginBottom: 12,
+              },
+            ]}
+          >
+            <Ionicons
+              name={
+                totalMirDiff === 0
+                  ? 'checkmark-circle'
+                  : totalMirDiff > 0
+                    ? 'arrow-up-circle'
+                    : 'arrow-down-circle'
+              }
+              size={13}
+              color={totalMirDiff === 0 ? T.success : totalMirDiff > 0 ? T.danger : T.warning}
+            />
+            <Text
+              style={[
+                styles.companyMirDiffText,
+                { color: totalMirDiff === 0 ? T.success : totalMirDiff > 0 ? T.danger : T.warning },
+              ]}
+            >
+              {totalMirDiff === 0
+                ? 'মীর সম্পূর্ণ মিলছে'
+                : totalMirDiff > 0
+                  ? `${Math.abs(totalMirDiff).toLocaleString()} PL বেশি (কোম্পানি)`
+                  : `${Math.abs(totalMirDiff).toLocaleString()} PL কম (কোম্পানি)`}
+            </Text>
+            {totalFish > 0 && (
+              <Text
+                style={[
+                  styles.companyTotalFish,
+                  {
+                    color: totalMirDiff === 0 ? T.success : totalMirDiff > 0 ? T.danger : T.warning,
+                  },
+                ]}
+              >
+                মোট: {totalFish.toLocaleString()} PL
+              </Text>
+            )}
+          </View>
+        </>
+      )}
+
+      <TouchableOpacity
+        style={[styles.companyViewBtn, { borderTopColor: T.border }]}
+        onPress={onViewDetail}
+        activeOpacity={0.8}
+      >
+        <Text style={[styles.companyViewBtnText, { color: T.textSecondary }]}>বিস্তারিত দেখুন</Text>
+        <Ionicons name="chevron-forward" size={13} color={T.textMuted} />
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+// ─── Batch Order Row ─────────────────────────────────────────────────────────────
 const BatchOrderRow = ({
   batchOrder,
   onDeliver,
@@ -1321,13 +1256,14 @@ const BatchOrderRow = ({
   const typeColor = getPonaTypeColor(batchOrder.order.ponaType) ?? T.accent;
   const st = STATUS[batchOrder.deliveryStatus as keyof typeof STATUS] ?? STATUS.pending;
   const hasMir = batchOrder.ourMir && batchOrder.companyMir;
+  const wasPartial = batchOrder.isPartial;
 
   return (
     <View
       style={[
         rowStyles.card,
         { backgroundColor: T.surface },
-        batchOrder.deliveryStatus === 'delivered' && rowStyles.cardDone,
+        batchOrder.deliveryStatus !== 'pending' && rowStyles.cardDone,
       ]}
     >
       <View style={[rowStyles.typeBar, { backgroundColor: typeColor }]} />
@@ -1336,9 +1272,16 @@ const BatchOrderRow = ({
           <Text style={[rowStyles.customerName, { color: T.textPrimary }]}>
             {batchOrder.order.customerName}
           </Text>
-          <View style={[rowStyles.statusPill, { backgroundColor: st.bg }]}>
-            <Ionicons name={st.icon} size={11} color={st.color} />
-            <Text style={[rowStyles.statusText, { color: st.color }]}>{st.label}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            {wasPartial && batchOrder.deliveryStatus !== 'pending' && (
+              <View style={[rowStyles.partialBadge, { backgroundColor: T.infoSoft }]}>
+                <Text style={[rowStyles.partialBadgeText, { color: T.info }]}>আংশিক</Text>
+              </View>
+            )}
+            <View style={[rowStyles.statusPill, { backgroundColor: st.bg }]}>
+              <Ionicons name={st.icon} size={11} color={st.color} />
+              <Text style={[rowStyles.statusText, { color: st.color }]}>{st.label}</Text>
+            </View>
           </View>
         </View>
         <Text style={[rowStyles.mobile, { color: T.textSecondary }]}>
@@ -1355,14 +1298,8 @@ const BatchOrderRow = ({
               ? `${(batchOrder.deliveredQuantity || 0).toLocaleString()} / ${batchOrder.order.plQuantity.toLocaleString()} PL`
               : `${batchOrder.order.plQuantity.toLocaleString()} PL`}
           </Text>
-          {batchOrder.deliveryStatus === 'partial' && (
-            <View style={[rowStyles.partialBadge, { backgroundColor: T.infoSoft }]}>
-              <Text style={[rowStyles.partialBadgeText, { color: T.info }]}>আংশিক</Text>
-            </View>
-          )}
         </View>
 
-        {/* Mir row */}
         {batchOrder.deliveryStatus !== 'pending' && hasMir && (
           <View style={[rowStyles.mirRow, { backgroundColor: T.infoSoft }]}>
             <View style={rowStyles.mirItem}>
@@ -1404,7 +1341,6 @@ const BatchOrderRow = ({
           </View>
         )}
 
-        {/* Financial */}
         {batchOrder.deliveryStatus !== 'pending' && (
           <View style={rowStyles.deliveredInfo}>
             <Text style={[rowStyles.deliveredInfoItem, { color: T.textSecondary }]}>
@@ -1430,7 +1366,6 @@ const BatchOrderRow = ({
           </View>
         )}
 
-        {/* Actions */}
         {batchOrder.deliveryStatus === 'pending' && (
           <View style={rowStyles.actionRow}>
             <TouchableOpacity
@@ -1454,7 +1389,7 @@ const BatchOrderRow = ({
   );
 };
 
-// ─── Main Screen ────────────────────────────────────────────────────────────────
+// ─── Main Screen ─────────────────────────────────────────────────────────────────
 export const BatchDetailsScreen = () => {
   const T = useTheme();
   const navigation = useNavigation<any>();
@@ -1504,8 +1439,7 @@ export const BatchDetailsScreen = () => {
   };
 
   const handleDisconnectCompany = () => {
-    confirm(
-      'কোম্পানি অর্ডার সরান',
+    showConfirm(
       'এই ব্যাচ থেকে কোম্পানি অর্ডার কানেকশন সরাতে চান?',
       async () => {
         try {
@@ -1516,25 +1450,28 @@ export const BatchDetailsScreen = () => {
           toast.error('সরানো ব্যর্থ');
         }
       },
+      undefined,
+      'কোম্পানি অর্ডার সরান',
     );
   };
 
   const handleDeliverySubmit = async (data: any) => {
-    if (!selectedBO) return;
+    const currentBO = selectedBO;
+    if (!currentBO) return;
     setSaving(true);
     try {
-      await batchAPI.recordDelivery(batchId, selectedBO.id, data);
-      setModalVisible(false);
-      setSelectedBO(null);
-      await fetchBatch();
+      await batchAPI.recordDelivery(batchId, currentBO.id, data);
       toast.success(
         data.isPartial
           ? `বাকি ${data.remainingQuantity.toLocaleString()} PL নতুন অর্ডার হয়েছে`
           : 'ডেলিভারি সম্পন্ন!',
         data.isPartial ? 'আংশিক ডেলিভারি' : 'সফল!',
       );
+      setModalVisible(false);
+      setTimeout(() => setSelectedBO(null), 300);
+      await fetchBatch();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'ডেলিভারি ব্যর্থ');
+      toast.error(err?.response?.data?.message || 'ডেলিভারি ব্যর্থ');
     } finally {
       setSaving(false);
     }
@@ -1578,7 +1515,7 @@ export const BatchDetailsScreen = () => {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Header card ── */}
+        {/* Header card */}
         <View
           style={[styles.headerCard, { backgroundColor: T.surface, borderBottomColor: T.border }]}
         >
@@ -1601,7 +1538,6 @@ export const BatchDetailsScreen = () => {
               <Text style={[styles.progressLabel, { color: T.accent }]}>সম্পন্ন</Text>
             </View>
           </View>
-
           <View style={[styles.progressBg, { backgroundColor: T.border }]}>
             <View
               style={[
@@ -1616,8 +1552,6 @@ export const BatchDetailsScreen = () => {
           <Text style={[styles.progressText, { color: T.textSecondary }]}>
             {pendingCount > 0 ? `${pendingCount} টি বাকি` : 'সব ডেলিভারি সম্পন্ন ✓'}
           </Text>
-
-          {/* Action buttons */}
           <View style={styles.headerActions}>
             <TouchableOpacity
               style={[
@@ -1629,8 +1563,6 @@ export const BatchDetailsScreen = () => {
               <Ionicons name="add-circle-outline" size={14} color={T.accent} />
               <Text style={[styles.headerActionText, { color: T.accent }]}>অর্ডার যোগ</Text>
             </TouchableOpacity>
-
-            {/* Connect or view company order */}
             {!companyOrder ? (
               <TouchableOpacity
                 style={[
@@ -1658,7 +1590,6 @@ export const BatchDetailsScreen = () => {
                 <Text style={[styles.headerActionText, { color: T.warning }]}>কোম্পানি হিসাব</Text>
               </TouchableOpacity>
             )}
-
             <TouchableOpacity
               style={[styles.headerActionBtn, { borderColor: T.info, backgroundColor: T.infoSoft }]}
               onPress={() => navigation.navigate('Collection', { batchId: batch.id })}
@@ -1667,8 +1598,6 @@ export const BatchDetailsScreen = () => {
               <Text style={[styles.headerActionText, { color: T.info }]}>কালেকশন</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Pona chips */}
           <View style={styles.ponaRow}>
             {PONA_CHIPS.map(({ key, label, color }) => {
               const ordered = (batch as any)[`totalOrdered${key}`] ?? 0;
@@ -1687,8 +1616,6 @@ export const BatchDetailsScreen = () => {
               );
             })}
           </View>
-
-          {/* Financial */}
           <View style={styles.finRow}>
             <View style={[styles.finItem, { backgroundColor: T.successSoft }]}>
               <Text style={[styles.finLabel, { color: T.textSecondary }]}>প্রাপ্ত</Text>
@@ -1716,7 +1643,7 @@ export const BatchDetailsScreen = () => {
           </View>
         </View>
 
-        {/* ── Company Order Summary ── */}
+        {/* Company order */}
         {companyOrder ? (
           <View style={{ marginTop: 14 }}>
             <CompanyOrderSummary
@@ -1727,7 +1654,6 @@ export const BatchDetailsScreen = () => {
               onViewDetail={() =>
                 navigation.navigate('CompanyOrderDetail', { orderId: companyOrder.id })
               }
-              navigation={navigation}
             />
           </View>
         ) : (
@@ -1752,7 +1678,7 @@ export const BatchDetailsScreen = () => {
           </TouchableOpacity>
         )}
 
-        {/* ── Order list ── */}
+        {/* Order list */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>
             অর্ডার তালিকা ({totalOrders} টি)
@@ -1772,7 +1698,7 @@ export const BatchDetailsScreen = () => {
           </View>
         </View>
 
-        {/* ── Expenses ── */}
+        {/* Expenses */}
         {batch.expenses && batch.expenses.length > 0 && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: T.textPrimary }]}>খরচের বিবরণ</Text>
@@ -1794,11 +1720,10 @@ export const BatchDetailsScreen = () => {
             </View>
           </View>
         )}
-
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* ── Bottom bar ── */}
+      {/* Bottom bar */}
       {batch.status !== 'completed' && (
         <View style={[styles.bottomBar, { backgroundColor: T.surface, borderTopColor: T.border }]}>
           {!canComplete ? (
@@ -1820,25 +1745,22 @@ export const BatchDetailsScreen = () => {
         </View>
       )}
 
-      {/* Modals */}
       <DeliveryModal
         visible={modalVisible}
         batchOrder={selectedBO}
         onClose={() => {
           setModalVisible(false);
-          setSelectedBO(null);
+          setTimeout(() => setSelectedBO(null), 300);
         }}
         onSubmit={handleDeliverySubmit}
         saving={saving}
       />
-
       <ConnectCompanyOrderModal
         visible={connectModalVisible}
         batchId={batchId}
         onClose={() => setConnectModalVisible(false)}
         onConnected={fetchBatch}
       />
-
       <AddOrderToBatchModal
         visible={addOrderModalVisible}
         batchId={batchId}
@@ -1849,7 +1771,7 @@ export const BatchDetailsScreen = () => {
   );
 };
 
-// ─── Styles ─────────────────────────────────────────────────────────────────────
+// ─── Styles ──────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -1891,8 +1813,6 @@ const styles = StyleSheet.create({
   finVal: { fontSize: 14, fontWeight: '800', marginTop: 2 },
   duePeopleBadge: { borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1, marginTop: 2 },
   duePeopleText: { color: '#fff', fontSize: 9, fontWeight: '700' },
-
-  // Connect banner
   connectCompanyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1905,8 +1825,6 @@ const styles = StyleSheet.create({
   },
   connectCompanyTitle: { fontSize: 13, fontWeight: '700' },
   connectCompanySub: { fontSize: 11, marginTop: 2 },
-
-  // Company card
   companyCard: { marginHorizontal: 12, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   companyCardHeader: {
     flexDirection: 'row',
@@ -1935,7 +1853,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   companyMirVisual: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1948,7 +1865,6 @@ const styles = StyleSheet.create({
   companyMirNumBig: { fontSize: 26, fontWeight: '900' },
   companyMirLabel: { fontSize: 10, marginTop: 3 },
   companyMirOp: { fontSize: 18, fontWeight: '300' },
-
   companyStatsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1959,7 +1875,6 @@ const styles = StyleSheet.create({
   companyStatDiv: { width: 1, height: 28 },
   companyStatLabel: { fontSize: 10, marginBottom: 3 },
   companyStatVal: { fontSize: 13, fontWeight: '700' },
-
   companyNetRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1968,7 +1883,6 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   companyNetLabel: { fontSize: 12, fontWeight: '600', flex: 1 },
-
   companyDivider: { height: 1, marginHorizontal: 14, marginBottom: 10, marginTop: 4 },
   companyMirCompareTitle: {
     fontSize: 10,
@@ -2013,19 +1927,6 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   companyViewBtnText: { fontSize: 13, fontWeight: '600' },
-  companyMetaRow: { flexDirection: 'row', gap: 10, marginTop: 6, flexWrap: 'wrap' },
-  companyMetaText: { fontSize: 11 },
-  companyNotesBox: {
-    marginHorizontal: 14,
-    marginBottom: 10,
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
-  },
-  companyNotesTitle: { fontSize: 11, fontWeight: '700', marginBottom: 4 },
-  companyNotesText: { fontSize: 13, lineHeight: 18 },
-
   section: { paddingHorizontal: 12, paddingTop: 14 },
   sectionTitle: { fontSize: 14, fontWeight: '800', marginBottom: 8 },
   orderList: { gap: 8 },
@@ -2204,15 +2105,6 @@ const mStyles = StyleSheet.create({
   progressBg: { flex: 1, height: 5, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: 5, borderRadius: 3 },
   progressPct: { fontSize: 11, fontWeight: '600', width: 34 },
-  partialBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: 8,
-    padding: 9,
-    marginTop: 6,
-  },
-  partialBannerText: { flex: 1, fontSize: 12, fontWeight: '500' },
   mirCompare: { borderRadius: 12, padding: 14, borderWidth: 1, marginTop: 4 },
   mirCompareTitle: {
     fontSize: 11,
@@ -2234,6 +2126,52 @@ const mStyles = StyleSheet.create({
   mirCompareVs: { fontSize: 13, fontWeight: '600', marginHorizontal: 8 },
   mirDiffRow: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, padding: 9 },
   mirDiffText: { fontSize: 12, fontWeight: '600', flex: 1 },
+  partialSwitcher: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 13,
+    marginTop: 10,
+  },
+  partialSwitcherTitle: { fontSize: 13, fontWeight: '700' },
+  partialSwitcherSub: { fontSize: 11, marginTop: 2 },
+  switchTrack: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  switchThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#fff',
+    position: 'absolute',
+    elevation: 2,
+  },
+  remainingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 8,
+  },
+  remainingLabel: { fontSize: 12, fontWeight: '700' },
+  remainingAuto: { fontSize: 10, marginTop: 3 },
+  remainingInput: {
+    borderWidth: 1.5,
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 16,
+    fontWeight: '800',
+    width: 72,
+    textAlign: 'center',
+  },
   calcRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2265,66 +2203,12 @@ const mStyles = StyleSheet.create({
   submitBtn: { borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
   submitBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   submitBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  partialSwitcher: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    padding: 13,
-    marginTop: 10,
-  },
-  partialSwitcherTitle: { fontSize: 13, fontWeight: '700' },
-  partialSwitcherSub: { fontSize: 11, marginTop: 2 },
-
-  switchTrack: {
-    width: 44,
-    height: 26,
-    borderRadius: 13,
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  switchThumb: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#fff',
-    position: 'absolute',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-
-  remainingBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    padding: 12,
-    marginTop: 8,
-  },
-  remainingLabel: { fontSize: 12, fontWeight: '700' },
-  remainingAuto: { fontSize: 10, marginTop: 3 },
-  remainingInput: {
-    borderWidth: 1.5,
-    borderRadius: 8,
-    padding: 8,
-    fontSize: 16,
-    fontWeight: '800',
-    width: 72,
-    textAlign: 'center',
-  },
 });
 
-// Connect modal styles
 const cStyles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 20 },
   emptyText: { fontSize: 15, fontWeight: '700', textAlign: 'center' },
-  emptySub: { fontSize: 13, textAlign: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, overflow: 'hidden' },
   headerBar: { width: 4, alignSelf: 'stretch' },
   headerContent: { flex: 1, paddingLeft: 14, paddingVertical: 14 },

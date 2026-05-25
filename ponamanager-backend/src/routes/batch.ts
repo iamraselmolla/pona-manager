@@ -33,15 +33,18 @@ export async function recomputeBatch(batchId: string) {
 
     if (pona === 'Golda PL') {
       totalOrderedGolda += qty;
-      if (bo.deliveryStatus === 'delivered') totalDeliveredGolda += bo.deliveredQuantity || 0;
+      if (bo.deliveryStatus === 'delivered' || bo.deliveryStatus === 'partial')
+        totalDeliveredGolda += bo.deliveredQuantity || 0;
     }
     if (pona === 'Bagda PL') {
       totalOrderedBagda += qty;
-      if (bo.deliveryStatus === 'delivered') totalDeliveredBagda += bo.deliveredQuantity || 0;
+      if (bo.deliveryStatus === 'delivered' || bo.deliveryStatus === 'partial')
+        totalDeliveredBagda += bo.deliveredQuantity || 0;
     }
     if (pona === 'Vannamei PL') {
       totalOrderedVannamei += qty;
-      if (bo.deliveryStatus === 'delivered') totalDeliveredVannamei += bo.deliveredQuantity || 0;
+      if (bo.deliveryStatus === 'delivered' || bo.deliveryStatus === 'partial')
+        totalDeliveredVannamei += bo.deliveredQuantity || 0;
     }
 
     if (bo.deliveryStatus === 'pending') {
@@ -283,43 +286,67 @@ router.patch('/:id/orders/:batchOrderId/deliver', async (req, res) => {
       notes,
       isPartial,
       remainingQuantity,
+      // mir fields
+      companyMir,
+      ourMir,
+      totalPoly,
+      mirDiff,
+      totalFish,
+      deliveredPL,
+      discount,
+      finalAmount: clientFinalAmount,
     } = req.body;
 
-    // Get order advance
     const bo = await prisma.batchOrder.findUnique({
       where: { id: req.params.batchOrderId },
       include: { order: true },
     });
     if (!bo) return res.status(404).json({ success: false, message: 'BatchOrder not found' });
 
-    const finalAmount = deliveredQuantity * deliveryRate;
+    const finalAmount = clientFinalAmount ?? deliveredQuantity * deliveryRate - (discount || 0);
+
+    // Advance carry: if paid more than finalAmount on partial, carry rest to new order
+    const totalPaid = (bo.order.advanceAmount || 0) + (customerPayment || 0);
+    const advanceCarry = isPartial && totalPaid > finalAmount ? totalPaid - finalAmount : 0;
 
     await prisma.$transaction(async (tx) => {
-      // Update batch order
+      // ── Update batchOrder ──────────────────────────────────────────────────
       await tx.batchOrder.update({
         where: { id: req.params.batchOrderId },
         data: {
-          deliveryStatus: 'delivered',
+          deliveryStatus: isPartial ? 'partial' : 'delivered',
           deliveredQuantity,
           deliveryRate,
           finalAmount,
+          discount: discount || 0,
           customerPayment: customerPayment || 0,
           dueAmount: dueAmount || 0,
-          duePaymentDate: dueAmount > 0 ? duePaymentDate : null,
+          duePaymentDate: dueAmount > 0 && duePaymentDate ? new Date(duePaymentDate) : null,
           notes,
           deliveredAt: new Date(),
+          // mir fields
+          companyMir: companyMir ?? null,
+          ourMir: ourMir ?? null,
+          mirDiff: mirDiff ?? null,
+          totalPoly: totalPoly ?? null,
+          totalFish: totalFish ?? null,
+          deliveredPL: deliveredPL ?? null,
         },
       });
 
-      // Mark order delivered
+      // ── Update order status ────────────────────────────────────────────────
       await tx.order.update({
         where: { id: bo.orderId },
-        data: { status: 'delivered', dueAmount: dueAmount || 0 },
+        data: {
+          status: isPartial ? 'partial' : 'delivered',
+          dueAmount: dueAmount || 0,
+        },
       });
 
-      // If partial delivery requested, create a new pending order for the remaining qty
-      if (isPartial && remainingQuantity && remainingQuantity > 0) {
+      // ── Create new pending order for remaining qty (partial) ──────────────
+      if (isPartial && remainingQuantity > 0) {
         const orig = bo.order;
+
         const newOrder = await tx.order.create({
           data: {
             customerId: orig.customerId || undefined,
@@ -330,44 +357,45 @@ router.patch('/:id/orders/:batchOrderId/deliver', async (req, res) => {
             plQuantity: remainingQuantity,
             unitRate: orig.unitRate,
             totalPrice: remainingQuantity * orig.unitRate,
-            advanceAmount: 0,
-            dueAmount: 0,
+            advanceAmount: advanceCarry, // ← carry forward overpaid amount
+            dueAmount: Math.max(0, remainingQuantity * orig.unitRate - advanceCarry),
             deliveryDate: orig.deliveryDate,
             status: 'pending',
             notes: orig.notes,
           },
         });
 
-        // Update customer running orders/stats
         if (orig.customerId) {
           await tx.customer.update({
             where: { id: orig.customerId },
-            data: { hasRunningOrder: true, totalOrders: { increment: 1 } },
+            data: {
+              hasRunningOrder: true,
+              totalOrders: { increment: 1 },
+            },
           });
         }
       }
 
-      // Update customer stats
+      // ── Update customer stats ─────────────────────────────────────────────
       if (bo.order.customerId) {
         await tx.customer.update({
           where: { id: bo.order.customerId },
           data: {
             totalPLPurchased: { increment: deliveredQuantity },
-            totalPaid: {
-              increment: (bo.order.advanceAmount || 0) + (customerPayment || 0),
-            },
+            totalPaid: { increment: (bo.order.advanceAmount || 0) + (customerPayment || 0) },
             totalDue: { increment: dueAmount || 0 },
           },
         });
       }
 
-      // Create payment record
-      if ((customerPayment || 0) + (bo.order.advanceAmount || 0) > 0 && bo.order.customerId) {
+      // ── Payment record ────────────────────────────────────────────────────
+      const payTotal = (customerPayment || 0) + (bo.order.advanceAmount || 0);
+      if (payTotal > 0 && bo.order.customerId) {
         await tx.payment.create({
           data: {
             customerId: bo.order.customerId,
             orderId: bo.orderId,
-            amount: (customerPayment || 0) + (bo.order.advanceAmount || 0),
+            amount: payTotal,
             date: new Date().toISOString().split('T')[0],
             notes: `Batch delivery: ${req.params.id}`,
           },
@@ -375,9 +403,8 @@ router.patch('/:id/orders/:batchOrderId/deliver', async (req, res) => {
       }
     });
 
-    const updatedBatch = await recomputeBatch(req.params.id);
-    const updatedBO = updatedBatch.batchOrders.find((b) => b.id === req.params.batchOrderId);
-    res.json({ success: true, data: updatedBO });
+    await recomputeBatch(req.params.id);
+    res.json({ success: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Failed to record delivery' });

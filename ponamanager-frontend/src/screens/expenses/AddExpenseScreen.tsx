@@ -228,7 +228,8 @@ export const AddExpenseScreen = () => {
 
     // Load running batches
     batchAPI
-      .getAll({ status: 'pending' })
+      // .getAll({ status: 'pending' })
+      .getAll()
       .then((res: any) => {
         const raw = res?.data?.data?.data ?? res?.data?.data ?? [];
         setBatches(Array.isArray(raw) ? raw : []);
