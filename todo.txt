@@ -18,5 +18,6 @@ emdad 5
 
 
 
-sadi 8 * 1160
-bipul
+sadi 8 * 1150
+bipul 5 * 1100
+lokman 1

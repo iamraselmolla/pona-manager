@@ -24,7 +24,7 @@ import { companyOrderAPI } from '../../api/companyOrderAPI';
 import { orderAPI } from '../../api/services';
 import { Batch, BatchOrder } from '../../types';
 import { formatCurrency, formatDate, getPonaTypeColor } from '../../utils/helpers';
-import { showConfirm } from '../../utils/AppModal';
+import { showConfirm } from '../../components/AppModal';
 
 // ─── Theme ──────────────────────────────────────────────────────────────────────
 const LIGHT = {
@@ -1241,7 +1241,6 @@ const CompanyOrderSummary = ({ companyOrder, batchOrders, T, onDisconnect, onVie
 };
 
 // ─── Batch Order Row ─────────────────────────────────────────────────────────────
-// ─── Batch Order Row (FIXED) ─────────────────────────────────────────────────────
 const BatchOrderRow = ({
   batchOrder,
   onDeliver,
@@ -1258,16 +1257,6 @@ const BatchOrderRow = ({
   const hasMir = batchOrder.ourMir && batchOrder.companyMir;
   const wasPartial = batchOrder.isPartial;
 
-  const deliveredQty = batchOrder.deliveredQuantity || 0;
-  const orderedQty = batchOrder.order.plQuantity;
-  const unitRate = batchOrder.order.unitRate;
-  const totalPrice = deliveredQty * unitRate;
-  const advance = batchOrder.order.advanceAmount || 0;
-  const customerPaid = batchOrder.customerPayment || 0;
-  const totalPaid = advance + customerPaid;
-  const dueAmount = batchOrder.dueAmount || 0;
-  const isFullyPaid = dueAmount === 0 && totalPaid >= totalPrice;
-
   return (
     <View
       style={[
@@ -1278,7 +1267,6 @@ const BatchOrderRow = ({
     >
       <View style={[rowStyles.typeBar, { backgroundColor: typeColor }]} />
       <View style={{ flex: 1, paddingLeft: 10 }}>
-        {/* Header: Name + Status */}
         <View style={rowStyles.top}>
           <Text style={[rowStyles.customerName, { color: T.textPrimary }]}>
             {batchOrder.order.customerName}
@@ -1295,13 +1283,9 @@ const BatchOrderRow = ({
             </View>
           </View>
         </View>
-
-        {/* Mobile */}
         <Text style={[rowStyles.mobile, { color: T.textSecondary }]}>
           {batchOrder.order.customerMobile}
         </Text>
-
-        {/* Pona type + Quantity */}
         <View style={rowStyles.metaRow}>
           <View style={[rowStyles.typePill, { backgroundColor: typeColor + '20' }]}>
             <Text style={[rowStyles.typeText, { color: typeColor }]}>
@@ -1310,76 +1294,11 @@ const BatchOrderRow = ({
           </View>
           <Text style={[rowStyles.qty, { color: T.textPrimary }]}>
             {batchOrder.deliveryStatus !== 'pending'
-              ? `${deliveredQty.toLocaleString()} / ${orderedQty.toLocaleString()} PL`
-              : `${orderedQty.toLocaleString()} PL`}
+              ? `${(batchOrder.deliveredQuantity || 0).toLocaleString()} / ${batchOrder.order.plQuantity.toLocaleString()} PL`
+              : `${batchOrder.order.plQuantity.toLocaleString()} PL`}
           </Text>
         </View>
 
-        {/* PRICE CARD – FIXED */}
-        <View
-          style={[
-            rowStyles.priceCard,
-            {
-              backgroundColor: T.surface, // ✅ fixed (was T.background)
-              borderColor: T.border,
-            },
-          ]}
-        >
-          {/* Delivered PL × Rate */}
-          <View style={rowStyles.priceRow}>
-            <Text style={[rowStyles.priceLabel, { color: T.textMuted }]}>ডেলিভারি PL</Text>
-            <Text style={[rowStyles.priceValue, { color: T.textPrimary }]}>
-              {deliveredQty.toLocaleString()} PL
-            </Text>
-          </View>
-
-          <View style={rowStyles.priceRow}>
-            <Text style={[rowStyles.priceLabel, { color: T.textMuted }]}>PL রেট</Text>
-            <Text style={[rowStyles.priceValue, { color: T.textPrimary }]}>৳{unitRate}</Text>
-          </View>
-
-          <View style={rowStyles.priceRow}>
-            <Text style={[rowStyles.priceLabel, { color: T.textMuted }]}>মোট মূল্য</Text>
-            <Text style={[rowStyles.priceValue, { color: typeColor }]}>
-              {formatCurrency(totalPrice)}
-            </Text>
-          </View>
-
-          {/* Advance + Today's Payment */}
-          <View style={rowStyles.priceRow}>
-            <Text style={[rowStyles.priceLabel, { color: T.textMuted }]}>অগ্রীম + পেমেন্ট</Text>
-            <Text style={[rowStyles.priceValue, { color: T.success }]}>
-              {formatCurrency(totalPaid)}
-            </Text>
-          </View>
-
-          {/* Due or Fully Paid */}
-          {dueAmount > 0 ? (
-            <View style={rowStyles.priceRow}>
-              <Text style={[rowStyles.priceLabel, { color: T.textMuted }]}>বাকি</Text>
-              <Text style={[rowStyles.priceValue, { color: T.danger }]}>
-                {formatCurrency(dueAmount)}
-              </Text>
-            </View>
-          ) : isFullyPaid ? (
-            <View style={rowStyles.priceRow}>
-              <Text style={[rowStyles.priceLabel, { color: T.textMuted }]}>পেমেন্ট স্ট্যাটাস</Text>
-              <Text style={[rowStyles.priceValue, { color: T.success }]}>সম্পূর্ণ পরিশোধ ✓</Text>
-            </View>
-          ) : null}
-
-          {/* If advance only (no delivery yet) */}
-          {batchOrder.deliveryStatus === 'pending' && advance > 0 && (
-            <View style={rowStyles.priceRow}>
-              <Text style={[rowStyles.priceLabel, { color: T.textMuted }]}>অগ্রিম জমা</Text>
-              <Text style={[rowStyles.priceValue, { color: T.info }]}>
-                {formatCurrency(advance)}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Mir info (only after delivery) */}
         {batchOrder.deliveryStatus !== 'pending' && hasMir && (
           <View style={[rowStyles.mirRow, { backgroundColor: T.infoSoft }]}>
             <View style={rowStyles.mirItem}>
@@ -1421,7 +1340,6 @@ const BatchOrderRow = ({
           </View>
         )}
 
-        {/* Delivery payment info (for delivered orders) */}
         {batchOrder.deliveryStatus !== 'pending' && (
           <View style={rowStyles.deliveredInfo}>
             <Text style={[rowStyles.deliveredInfoItem, { color: T.textSecondary }]}>
@@ -1447,7 +1365,6 @@ const BatchOrderRow = ({
           </View>
         )}
 
-        {/* Action buttons */}
         {batchOrder.deliveryStatus === 'pending' && (
           <View style={rowStyles.actionRow}>
             <TouchableOpacity
@@ -1467,211 +1384,6 @@ const BatchOrderRow = ({
           </View>
         )}
       </View>
-    </View>
-  );
-};
-
-// ─── Batch Financial Summary ─────────────────────────────────────────────────────
-// ─── Batch Financial Summary (World Class Design) ──────────────────────────────
-const BatchFinancialSummary = ({ batch, companyOrder, T }: any) => {
-  // ----- Customer side -----
-  let totalDeliveredPL = 0;
-  let totalRevenue = 0;
-  let totalCustomerPaid = batch.totalCollected || 0;
-  let totalCustomerDue = batch.totalDue || 0;
-
-  batch.batchOrders?.forEach((bo: any) => {
-    const deliveredQty = bo.deliveredQuantity || 0;
-    const unitRate = bo.order?.unitRate || 0;
-    totalDeliveredPL += deliveredQty;
-    totalRevenue += deliveredQty * unitRate;
-  });
-
-  // ----- Company side -----
-  let companyMir = 0;
-  let companyPoly = 0;
-  let companyTotalPL = 0;
-  let companyRate = 0;
-  let companyTotalPrice = 0;
-  let companyPaid = 0;
-  let companyAdvance = 0;
-  let companyDue = 0;
-
-  if (companyOrder) {
-    companyMir = companyOrder.mirValue || 0;
-    companyPoly = companyOrder.totalPoly || 0;
-    companyTotalPL = companyOrder.totalPL || companyOrder.expectedPL || 0;
-    companyRate = companyOrder.ratePerPL || 0;
-    companyTotalPrice =
-      companyOrder.actualAmount || companyOrder.paymentAmount || companyTotalPL * companyRate;
-    companyPaid = companyOrder.paymentAmount || 0;
-    if (companyOrder.netDue > 0) companyDue = companyOrder.netDue;
-    if (companyOrder.netAdvance > 0) companyAdvance = companyOrder.netAdvance;
-  }
-
-  const totalExpenses = batch.totalExpenses || 0;
-  const companyCost = companyTotalPrice;
-  const profit = totalRevenue - (totalExpenses + companyCost);
-  const profitColor = profit >= 0 ? T.success : T.danger;
-
-  return (
-    <View style={[styles.summaryCard, { backgroundColor: T.surface, borderColor: T.border }]}>
-      {/* Header */}
-      <View style={styles.summaryHeader}>
-        <Ionicons name="stats-chart" size={20} color={T.accent} />
-        <Text style={[styles.summaryTitle, { color: T.textPrimary }]}>লাভ-ক্ষতির হিসাব</Text>
-      </View>
-
-      {/* Two big numbers: Total Sale & Total Cost */}
-      <View style={styles.bigNumbersRow}>
-        <View style={[styles.bigNumberBox, { backgroundColor: T.accentSoft }]}>
-          <Text style={[styles.bigNumberLabel, { color: T.textMuted }]}>মোট বিক্রয়</Text>
-          <Text style={[styles.bigNumberValue, { color: T.accent }]}>
-            {formatCurrency(totalRevenue)}
-          </Text>
-        </View>
-        <View style={[styles.bigNumberBox, { backgroundColor: T.warningSoft }]}>
-          <Text style={[styles.bigNumberLabel, { color: T.textMuted }]}>
-            মোট খরচ (কোম্পানি + অন্যান্য)
-          </Text>
-          <Text style={[styles.bigNumberValue, { color: T.warning }]}>
-            {formatCurrency(totalExpenses + companyCost)}
-          </Text>
-        </View>
-      </View>
-
-      {/* Profit Highlight */}
-      <View
-        style={[
-          styles.profitHighlight,
-          { backgroundColor: profitColor + '12', borderColor: profitColor + '30' },
-        ]}
-      >
-        <View>
-          <Text style={[styles.profitHighlightLabel, { color: profitColor }]}>
-            নিট লাভ / (ক্ষতি)
-          </Text>
-          <Text style={[styles.profitHighlightSub, { color: T.textMuted }]}>
-            বিক্রয় - (কোম্পানি মূল্য + খরচ)
-          </Text>
-        </View>
-        <Text style={[styles.profitHighlightValue, { color: profitColor }]}>
-          {profit >= 0 ? `+${formatCurrency(profit)}` : `-${formatCurrency(Math.abs(profit))}`}
-        </Text>
-      </View>
-
-      {/* Separator */}
-      <View style={[styles.divider, { backgroundColor: T.border }]} />
-
-      {/* Company Details Grid */}
-      {companyOrder && (
-        <>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="business-outline" size={14} color={T.info} />
-            <Text style={[styles.sectionHeaderText, { color: T.textPrimary }]}>কোম্পানির তথ্য</Text>
-          </View>
-          <View style={styles.infoGrid}>
-            <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: T.textMuted }]}>মীর</Text>
-              <Text style={[styles.infoValue, { color: T.info }]}>
-                {companyMir.toLocaleString()}
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: T.textMuted }]}>পলি</Text>
-              <Text style={[styles.infoValue, { color: T.info }]}>
-                {companyPoly.toLocaleString()}
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: T.textMuted }]}>মোট PL</Text>
-              <Text style={[styles.infoValue, { color: T.info }]}>
-                {companyTotalPL.toLocaleString()} PL
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: T.textMuted }]}>দর/PL</Text>
-              <Text style={[styles.infoValue, { color: T.info }]}>৳{companyRate}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: T.textMuted }]}>মোট টাকা</Text>
-              <Text style={[styles.infoValue, { color: T.warning }]}>
-                {formatCurrency(companyTotalPrice)}
-              </Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: T.textMuted }]}>জমা / অগ্রীম</Text>
-              <Text style={[styles.infoValue, { color: T.success }]}>
-                {companyAdvance > 0 ? formatCurrency(companyAdvance) : formatCurrency(companyPaid)}
-              </Text>
-            </View>
-            {companyDue > 0 && (
-              <View style={styles.infoItem}>
-                <Text style={[styles.infoLabel, { color: T.textMuted }]}>বাকি দিতে হবে</Text>
-                <Text style={[styles.infoValue, { color: T.danger }]}>
-                  {formatCurrency(companyDue)}
-                </Text>
-              </View>
-            )}
-          </View>
-          <View style={[styles.divider, { backgroundColor: T.border }]} />
-        </>
-      )}
-
-      {/* Customer Details */}
-      <View style={styles.sectionHeader}>
-        <Ionicons name="people-outline" size={14} color={T.success} />
-        <Text style={[styles.sectionHeaderText, { color: T.textPrimary }]}>
-          গ্রাহক ডেলিভারি সারাংশ
-        </Text>
-      </View>
-      <View style={styles.infoGrid}>
-        <View style={styles.infoItem}>
-          <Text style={[styles.infoLabel, { color: T.textMuted }]}>মোট ডেলিভারি PL</Text>
-          <Text style={[styles.infoValue, { color: T.textPrimary }]}>
-            {totalDeliveredPL.toLocaleString()} PL
-          </Text>
-        </View>
-        <View style={styles.infoItem}>
-          <Text style={[styles.infoLabel, { color: T.textMuted }]}>মোট দাম (বিক্রয়)</Text>
-          <Text style={[styles.infoValue, { color: T.accent }]}>
-            {formatCurrency(totalRevenue)}
-          </Text>
-        </View>
-        <View style={styles.infoItem}>
-          <Text style={[styles.infoLabel, { color: T.textMuted }]}>মোট প্রাপ্ত পেমেন্ট</Text>
-          <Text style={[styles.infoValue, { color: T.success }]}>
-            {formatCurrency(totalCustomerPaid)}
-          </Text>
-        </View>
-        {totalCustomerDue > 0 && (
-          <View style={styles.infoItem}>
-            <Text style={[styles.infoLabel, { color: T.textMuted }]}>বাকি</Text>
-            <Text style={[styles.infoValue, { color: T.danger }]}>
-              {formatCurrency(totalCustomerDue)}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Expenses */}
-      {totalExpenses > 0 && (
-        <>
-          <View style={[styles.divider, { backgroundColor: T.border }]} />
-          <View style={styles.sectionHeader}>
-            <Ionicons name="receipt-outline" size={14} color={T.warning} />
-            <Text style={[styles.sectionHeaderText, { color: T.textPrimary }]}>অন্যান্য খরচ</Text>
-          </View>
-          <View style={styles.infoGrid}>
-            <View style={styles.infoItem}>
-              <Text style={[styles.infoLabel, { color: T.textMuted }]}>মোট খরচ</Text>
-              <Text style={[styles.infoValue, { color: T.warning }]}>
-                {formatCurrency(totalExpenses)}
-              </Text>
-            </View>
-          </View>
-        </>
-      )}
     </View>
   );
 };
@@ -2007,11 +1719,7 @@ export const BatchDetailsScreen = () => {
             </View>
           </View>
         )}
-
-        {/* ⭐ NEW: Financial Summary */}
-        <BatchFinancialSummary batch={batch} companyOrder={companyOrder} T={T} />
-
-        <View style={{ height: 20 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* Bottom bar */}
@@ -2259,99 +1967,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   completeBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  summaryCard: {
-    marginHorizontal: 12,
-    marginTop: 14,
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 16,
-    gap: 14,
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingBottom: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
-  },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  bigNumbersRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  bigNumberBox: {
-    flex: 1,
-    borderRadius: 14,
-    padding: 12,
-    alignItems: 'center',
-  },
-  bigNumberLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  bigNumberValue: {
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  profitHighlight: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-  },
-  profitHighlightLabel: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  profitHighlightSub: {
-    fontSize: 9,
-    marginTop: 2,
-  },
-  profitHighlightValue: {
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  divider: {
-    height: 1,
-    marginVertical: 4,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  sectionHeaderText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  infoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  infoItem: {
-    flex: 1,
-    minWidth: '40%',
-    backgroundColor: 'rgba(0,0,0,0.02)',
-    borderRadius: 10,
-    padding: 10,
-  },
-  infoLabel: {
-    fontSize: 10,
-    marginBottom: 4,
-  },
-  infoValue: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
 });
 
 const rowStyles = StyleSheet.create({
@@ -2425,27 +2040,6 @@ const rowStyles = StyleSheet.create({
     paddingVertical: 6,
   },
   unbatchBtnText: { fontSize: 11, fontWeight: '700' },
-  // ⭐ PRICE CARD STYLES (must be present)
-  priceCard: {
-    marginTop: 10,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 10,
-    gap: 6,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  priceLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  priceValue: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
 });
 
 const mStyles = StyleSheet.create({

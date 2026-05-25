@@ -74,6 +74,7 @@ export interface BatchOrder {
   order: Order;
   createdAt?: string;
   updatedAt?: string;
+  isPartial?: boolean;
 }
 
 export interface BatchExpense {
