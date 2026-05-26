@@ -18,6 +18,7 @@ import { batchAPI } from '../../api/batchServices';
 import { Batch, BatchStatus } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/helpers';
 import dayjs from 'dayjs';
+import Toast from 'react-native-toast-message';
 
 // ── Design tokens ─────────────────────────────────────────
 const P = {
@@ -58,6 +59,12 @@ const STATUS_CONFIG: Record<
     icon: 'checkmark-circle-outline',
   },
   has_due: { label: 'বাকি আছে', color: P.danger, soft: P.dangerSoft, icon: 'alert-circle-outline' },
+  closed: {
+    label: 'বন্ধ',
+    color: P.textMuted,
+    soft: 'rgba(255,255,255,0.06)',
+    icon: 'lock-closed-outline',
+  },
 };
 const getSafeStatus = (s: string) =>
   (STATUS_CONFIG as any)[s] ?? {
@@ -88,6 +95,7 @@ const BatchCard = ({
   const cfg = getSafeStatus(batch.status);
   const total = batch.batchOrders?.length ?? 0;
   const delivered = batch.batchOrders?.filter((o) => o.deliveryStatus === 'delivered').length ?? 0;
+
   const pct = total > 0 ? delivered / total : 0;
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -110,13 +118,18 @@ const BatchCard = ({
     ]).start();
   }, []);
 
-  // 3-dot menu options depend on status
-  const isCompleted = batch.status === 'completed';
+  // ✅ only closed batch cannot be deleted
+  const isClosed = batch?.status === 'closed';
 
   const showMenu = () => {
-    const actions: any[] = [{ text: 'বাতিল করুন', style: 'cancel' }];
+    const actions: any[] = [
+      {
+        text: 'বাতিল করুন',
+        style: 'cancel',
+      },
+    ];
 
-    if (!isCompleted) {
+    if (!isClosed) {
       actions.push({
         text: '🗑️  ব্যাচ মুছুন (সব অর্ডার মুক্ত হবে)',
         style: 'destructive',
@@ -126,24 +139,31 @@ const BatchCard = ({
 
     Alert.alert(
       batch.batchNumber,
-      isCompleted ? 'সম্পন্ন ব্যাচ মুছে ফেলা যায় না।' : 'কী করতে চান?',
+      isClosed ? 'বন্ধ ব্যাচ মুছে ফেলা যায় না।' : 'কী করতে চান?',
       actions,
     );
   };
 
   return (
-    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [{ translateY: slideAnim }],
+      }}
+    >
       <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.82}>
         {/* Left accent stripe */}
         <View style={[styles.accentStripe, { backgroundColor: cfg.color }]} />
 
         <View style={styles.cardInner}>
-          {/* Row 1: batch number + status + 3-dot */}
+          {/* Row 1 */}
           <View style={styles.row1}>
             <View style={styles.batchNumWrap}>
               <Text style={styles.batchNum}>{batch.batchNumber}</Text>
+
               <View style={styles.dateChip}>
                 <Ionicons name="calendar-outline" size={10} color={P.textMuted} />
+
                 <Text style={styles.dateText}>{formatDate(batch.batchDate)}</Text>
               </View>
             </View>
@@ -151,51 +171,71 @@ const BatchCard = ({
             <View style={styles.row1Right}>
               <View style={[styles.statusPill, { backgroundColor: cfg.soft }]}>
                 <Ionicons name={cfg.icon} size={11} color={cfg.color} />
+
                 <Text style={[styles.statusLabel, { color: cfg.color }]}>{cfg.label}</Text>
               </View>
 
-              {/* 3-dot menu button */}
+              {/* 3-dot menu */}
               <TouchableOpacity
                 style={styles.menuBtn}
                 onPress={(e) => {
                   e.stopPropagation?.();
                   showMenu();
                 }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                hitSlop={{
+                  top: 8,
+                  bottom: 8,
+                  left: 8,
+                  right: 8,
+                }}
               >
                 <Ionicons name="ellipsis-vertical" size={16} color={P.textMuted} />
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Row 2: progress bar */}
+          {/* Progress */}
           <View style={styles.progressRow}>
             <View style={styles.progressBg}>
               <View
                 style={[
                   styles.progressFill,
-                  { width: `${Math.min(pct * 100, 100)}%`, backgroundColor: cfg.color },
+                  {
+                    width: `${Math.min(pct * 100, 100)}%`,
+                    backgroundColor: cfg.color,
+                  },
                 ]}
               />
             </View>
+
             <Text style={styles.progressLabel}>
               {delivered}/{total}
             </Text>
           </View>
 
-          {/* Row 3: pona chips + financials */}
+          {/* Row 3 */}
           <View style={styles.row3}>
             <View style={styles.ponaRow}>
               {PONA_CHIPS.map(({ key, label, color, soft }) => {
                 const ordered = (batch as any)[`totalOrdered${key}`] ?? 0;
+
                 const deld = (batch as any)[`totalDelivered${key}`] ?? 0;
+
                 if (ordered === 0) return null;
+
                 return (
                   <View
                     key={key}
-                    style={[styles.ponaChip, { backgroundColor: soft, borderColor: color + '44' }]}
+                    style={[
+                      styles.ponaChip,
+                      {
+                        backgroundColor: soft,
+                        borderColor: color + '44',
+                      },
+                    ]}
                   >
                     <Text style={[styles.ponaLabel, { color }]}>{label}</Text>
+
                     <Text style={[styles.ponaVal, { color }]}>
                       {deld}/{ordered}
                     </Text>
@@ -207,16 +247,20 @@ const BatchCard = ({
             <View style={styles.finRow}>
               <View style={[styles.finChip, { backgroundColor: P.successSoft }]}>
                 <Ionicons name="arrow-down-circle-outline" size={11} color={P.success} />
+
                 <Text style={[styles.finVal, { color: P.success }]}>
                   {formatCurrency(batch.totalCollected)}
                 </Text>
               </View>
+
               {(batch.totalDue ?? 0) > 0 && (
                 <View style={[styles.finChip, { backgroundColor: P.dangerSoft }]}>
                   <Ionicons name="alert-circle-outline" size={11} color={P.danger} />
+
                   <Text style={[styles.finVal, { color: P.danger }]}>
                     {formatCurrency(batch.totalDue)}
                   </Text>
+
                   {(batch.duePendingCount ?? 0) > 0 && (
                     <View style={styles.countBubble}>
                       <Text style={styles.countBubbleText}>{batch.duePendingCount}</Text>
@@ -227,10 +271,11 @@ const BatchCard = ({
             </View>
           </View>
 
-          {/* Delete warning bar for non-completed */}
-          {!isCompleted && (
+          {/* ✅ delete bar only hidden for closed */}
+          {!isClosed && (
             <TouchableOpacity style={styles.deleteBar} onPress={onDelete}>
               <Ionicons name="trash-outline" size={13} color={P.danger} />
+
               <Text style={styles.deleteBarText}>ব্যাচ মুছুন — সব অর্ডার pending এ ফিরবে</Text>
             </TouchableOpacity>
           )}
@@ -251,6 +296,7 @@ const FILTERS: { key: BatchStatus | ''; label: string }[] = [
   { key: 'in_progress', label: 'চলমান' },
   { key: 'completed', label: 'সম্পন্ন' },
   { key: 'has_due', label: 'বাকি' },
+  { key: 'closed', label: 'বন্ধ' },
 ];
 
 // ── Main Screen ───────────────────────────────────────────
@@ -296,8 +342,8 @@ export const BatchListScreen = () => {
 
   // ── Delete batch ──────────────────────────────────────
   const handleDelete = (batch: Batch) => {
-    if (batch.status === 'completed') {
-      Alert.alert('অনুমতি নেই', 'সম্পন্ন ব্যাচ মুছে ফেলা যাবে না।');
+    if (batch?.status === 'closed') {
+      Toast.show({ type: 'error', text1: 'সম্পন্ন ব্যাচ মুছে ফেলা যায়নি' });
       return;
     }
     setSelectedBatch(batch);
@@ -305,11 +351,14 @@ export const BatchListScreen = () => {
   };
 
   const confirmDelete = async () => {
+    console.log('Deleting batch', selectedBatch?.id);
     if (!selectedBatch) return;
     setDeleting(true);
 
     try {
-      await batchAPI.deleteBatch(selectedBatch.id);
+      console.log('Calling API to delete batch', selectedBatch.id);
+      await batchAPI.delete(selectedBatch.id);
+      console.log('Batch deleted successfully, updating state');
       setBatches((prev) => prev.filter((b) => b.id !== selectedBatch.id));
       setConfirmVisible(false);
       setSelectedBatch(null);

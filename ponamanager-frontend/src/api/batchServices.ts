@@ -82,7 +82,7 @@ export const batchAPI = {
     apiClient.delete(`/batches/${batchId}/expenses/${expenseId}`),
   closeBatch: (batchId: string) => apiClient.patch(`/batches/${batchId}/close`),
   recordDuePayment: (batchOrderId: string, amount: number) =>
-    apiClient.patch(`/batch-orders/${batchOrderId}/pay-due`, { amount }),
+    apiClient.patch(`/batches/${batchOrderId}/pay-due`, { amount }),
   recordAdvanceRefund: (orderId: string, amount: number) =>
-    apiClient.patch(`/orders/${orderId}/refund-advance`, { amount }),
+    apiClient.patch(`/batches/${orderId}/refund-advance`, { amount }),
 };

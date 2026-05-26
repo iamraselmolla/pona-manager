@@ -195,7 +195,6 @@ router.delete('/:id', async (req, res) => {
     const order = await prisma.order.findUnique({
       where: { id: req.params.id },
     });
-
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
@@ -207,7 +206,7 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    await prisma.order.delete({ where: { id: req.params.id } });
+    const deletedOrder = await prisma.order.delete({ where: { id: req.params.id } });
 
     if (order.customerId) {
       const runningCount = await prisma.order.count({

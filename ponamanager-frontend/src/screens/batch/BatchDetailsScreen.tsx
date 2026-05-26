@@ -218,26 +218,37 @@ const DuePaymentModal = ({ visible, batchOrder, onClose, onSaved, T }: any) => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (visible) setAmount('');
-  }, [visible]);
+    if (visible) {
+      const due = Number(batchOrder?.dueAmount || 0);
+      setAmount(due > 0 ? due.toString() : '');
+    }
+  }, [visible, batchOrder]);
+
   if (!batchOrder) return null;
 
-  const maxDue = batchOrder.dueAmount || 0;
+  const maxDue = Number(batchOrder.dueAmount || 0);
 
   const handleSave = async () => {
-    const amt = parseFloat(amount);
-    if (!amt || amt <= 0) {
-      toast.warn('পরিমাণ দিন');
+    const amt = Number(amount);
+
+    if (!amt || isNaN(amt) || amt <= 0) {
+      toast.warn('সঠিক পরিমাণ দিন');
       return;
     }
+
+    // exact amount only
     if (amt > maxDue) {
-      toast.warn(`সর্বোচ্চ ${maxDue} টাকা`);
+      toast.warn(`ঠিক ${formatCurrency(maxDue)} পরিশোধ করতে হবে`);
       return;
     }
+
     setSaving(true);
+
     try {
       await batchAPI.recordDuePayment(batchOrder.id, amt);
+
       toast.success('পেমেন্ট যোগ হয়েছে');
+
       onSaved();
       onClose();
     } catch (e: any) {
@@ -258,22 +269,62 @@ const DuePaymentModal = ({ visible, batchOrder, onClose, onSaved, T }: any) => {
           padding: 24,
         }}
       >
-        <View style={{ backgroundColor: T.surface, borderRadius: 20, padding: 24, width: '100%' }}>
-          <Text style={{ fontSize: 17, fontWeight: '800', color: T.textPrimary, marginBottom: 4 }}>
+        <View
+          style={{
+            backgroundColor: T.surface,
+            borderRadius: 20,
+            padding: 24,
+            width: '100%',
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 17,
+              fontWeight: '800',
+              color: T.textPrimary,
+              marginBottom: 4,
+            }}
+          >
             বাকি পরিশোধ
           </Text>
-          <Text style={{ fontSize: 13, color: T.textMuted, marginBottom: 16 }}>
+
+          <Text
+            style={{
+              fontSize: 13,
+              color: T.textMuted,
+              marginBottom: 16,
+            }}
+          >
             {batchOrder.order?.customerName} · বাকি: {formatCurrency(maxDue)}
           </Text>
+
           <InputField
             label="পরিমাণ (৳)"
             value={amount}
             onChange={setAmount}
             suffix="৳"
             placeholder={maxDue.toString()}
+            keyboardType="numeric"
             T={T}
           />
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+
+          <Text
+            style={{
+              fontSize: 12,
+              color: T.warning,
+              marginTop: 8,
+            }}
+          >
+            সম্পূর্ণ বাকি একবারেই পরিশোধ করতে হবে
+          </Text>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              marginTop: 16,
+            }}
+          >
             <TouchableOpacity
               style={{
                 flex: 1,
@@ -284,9 +335,18 @@ const DuePaymentModal = ({ visible, batchOrder, onClose, onSaved, T }: any) => {
                 alignItems: 'center',
               }}
               onPress={onClose}
+              disabled={saving}
             >
-              <Text style={{ fontWeight: '700', color: T.textSecondary }}>বাতিল</Text>
+              <Text
+                style={{
+                  fontWeight: '700',
+                  color: T.textSecondary,
+                }}
+              >
+                বাতিল
+              </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={{
                 flex: 1,
@@ -301,7 +361,14 @@ const DuePaymentModal = ({ visible, batchOrder, onClose, onSaved, T }: any) => {
               {saving ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={{ fontWeight: '800', color: '#fff' }}>সেভ করুন</Text>
+                <Text
+                  style={{
+                    fontWeight: '800',
+                    color: '#fff',
+                  }}
+                >
+                  সেভ করুন
+                </Text>
               )}
             </TouchableOpacity>
           </View>
@@ -316,27 +383,39 @@ const AdvanceRefundModal = ({ visible, batchOrder, onClose, onSaved, T }: any) =
   const [amount, setAmount] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const advance = Number(batchOrder?.order?.advanceAmount || 0);
+  const finalAmount = Number(batchOrder?.finalAmount || 0);
+
+  const refundable = Math.max(0, advance - finalAmount);
+
   useEffect(() => {
-    if (visible) setAmount('');
-  }, [visible]);
+    if (visible) {
+      setAmount(refundable > 0 ? refundable.toString() : '');
+    }
+  }, [visible, refundable]);
+
   if (!batchOrder) return null;
 
-  const advance = batchOrder.order?.advanceAmount || 0;
-
   const handleSave = async () => {
-    const amt = parseFloat(amount);
-    if (!amt || amt <= 0) {
-      toast.warn('পরিমাণ দিন');
+    const amt = Number(amount);
+
+    if (!amt || isNaN(amt) || amt <= 0) {
+      toast.warn('সঠিক পরিমাণ দিন');
       return;
     }
-    if (amt > advance) {
-      toast.warn(`সর্বোচ্চ ${advance} টাকা`);
+
+    if (amt !== refundable) {
+      toast.warn(`ঠিক ${formatCurrency(refundable)} সমন্বয় করতে হবে`);
       return;
     }
+
     setSaving(true);
+
     try {
       await batchAPI.recordAdvanceRefund(batchOrder.order.id, amt);
+
       toast.success('অগ্রীম সমন্বয় হয়েছে');
+
       onSaved();
       onClose();
     } catch (e: any) {
@@ -345,7 +424,6 @@ const AdvanceRefundModal = ({ visible, batchOrder, onClose, onSaved, T }: any) =
       setSaving(false);
     }
   };
-
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View
@@ -357,22 +435,63 @@ const AdvanceRefundModal = ({ visible, batchOrder, onClose, onSaved, T }: any) =
           padding: 24,
         }}
       >
-        <View style={{ backgroundColor: T.surface, borderRadius: 20, padding: 24, width: '100%' }}>
-          <Text style={{ fontSize: 17, fontWeight: '800', color: T.textPrimary, marginBottom: 4 }}>
+        <View
+          style={{
+            backgroundColor: T.surface,
+            borderRadius: 20,
+            padding: 24,
+            width: '100%',
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 17,
+              fontWeight: '800',
+              color: T.textPrimary,
+              marginBottom: 4,
+            }}
+          >
             অগ্রীম সমন্বয়
           </Text>
-          <Text style={{ fontSize: 13, color: T.textMuted, marginBottom: 16 }}>
-            {batchOrder.order?.customerName} · অগ্রীম: {formatCurrency(advance)}
+
+          <Text
+            style={{
+              fontSize: 13,
+              color: T.textMuted,
+              marginBottom: 16,
+            }}
+          >
+            {batchOrder.order?.customerName} · অগ্রীম: {formatCurrency(advance)} · সমন্বয়যোগ্য:{' '}
+            {formatCurrency(refundable)}
           </Text>
+
           <InputField
             label="পরিমাণ (৳)"
             value={amount}
             onChange={setAmount}
             suffix="৳"
-            placeholder={advance.toString()}
+            placeholder={refundable.toString()}
+            keyboardType="numeric"
             T={T}
           />
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+
+          <Text
+            style={{
+              fontSize: 12,
+              color: T.warning,
+              marginTop: 8,
+            }}
+          >
+            অতিরিক্ত অগ্রীম সম্পূর্ণ সমন্বয় করতে হবে
+          </Text>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              marginTop: 16,
+            }}
+          >
             <TouchableOpacity
               style={{
                 flex: 1,
@@ -383,9 +502,18 @@ const AdvanceRefundModal = ({ visible, batchOrder, onClose, onSaved, T }: any) =
                 alignItems: 'center',
               }}
               onPress={onClose}
+              disabled={saving}
             >
-              <Text style={{ fontWeight: '700', color: T.textSecondary }}>বাতিল</Text>
+              <Text
+                style={{
+                  fontWeight: '700',
+                  color: T.textSecondary,
+                }}
+              >
+                বাতিল
+              </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={{
                 flex: 1,
@@ -400,7 +528,14 @@ const AdvanceRefundModal = ({ visible, batchOrder, onClose, onSaved, T }: any) =
               {saving ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={{ fontWeight: '800', color: '#fff' }}>সমন্বয় করুন</Text>
+                <Text
+                  style={{
+                    fontWeight: '800',
+                    color: '#fff',
+                  }}
+                >
+                  সমন্বয় করুন
+                </Text>
               )}
             </TouchableOpacity>
           </View>
@@ -1238,7 +1373,7 @@ const AddOrderToBatchModal = ({ visible, batchId, onClose, onAdded }: any) => {
   const handleAdd = async (orderId: string) => {
     setAdding(orderId);
     try {
-      await batchAPI.addOrderToBatch(batchId, orderId);
+      await batchAPI.addOrders(batchId, [orderId]);
       toast.success('অর্ডার ব্যাচে যোগ হয়েছে');
       onAdded();
       onClose();
@@ -2434,10 +2569,11 @@ export const BatchDetailsScreen = () => {
           </View>
         )}
 
-        <View style={{ height: 120 }} />
+        <View style={{ height: 20 }} />
 
         {/* Financial Summary */}
         <BatchFinancialSummary batch={batch} companyOrder={companyOrder} T={T} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* Bottom bar */}

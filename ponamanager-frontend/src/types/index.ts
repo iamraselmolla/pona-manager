@@ -25,7 +25,7 @@ export interface Customer {
 
 export type PonaType = 'Golda PL' | 'Bagda PL' | 'Vannamei PL';
 export type OrderStatus = 'pending' | 'in_batch' | 'delivered' | 'cancelled';
-export type BatchStatus = 'pending' | 'in_progress' | 'completed' | 'has_due';
+export type BatchStatus = 'pending' | 'in_progress' | 'completed' | 'has_due' | 'closed';
 
 export interface Order {
   id: string;

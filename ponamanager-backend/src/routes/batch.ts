@@ -366,7 +366,7 @@ router.patch('/:id/orders/:batchOrderId/deliver', async (req, res) => {
           discount: discount || 0,
           customerPayment: customerPayment || 0,
           dueAmount: dueAmount || 0,
-          duePaymentDate: dueAmount > 0 && duePaymentDate ? new Date(duePaymentDate) : null,
+          duePaymentDate: dueAmount > 0 && duePaymentDate ? '' : null,
           notes,
           deliveredAt: new Date(),
           // mir fields
@@ -648,7 +648,7 @@ router.post('/:id/expenses', async (req, res) => {
 
     const batch = await prisma.batch.findUnique({ where: { id: req.params.id } });
     if (!batch) return res.status(404).json({ success: false, message: 'Batch not found' });
-    if (batch.status === 'completed') {
+    if (batch.status === 'closed') {
       return res
         .status(400)
         .json({ success: false, message: 'Cannot add expense to completed batch' });
@@ -772,6 +772,97 @@ router.patch('/:id/close', async (req, res) => {
     res.json({ success: true });
   } catch (e: any) {
     res.status(500).json({ success: false, message: 'Failed to close batch' });
+  }
+});
+
+// PATCH /batch-orders/:id/pay-due
+router.patch('/:id/pay-due', async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const bo = await prisma.batchOrder.findUnique({
+      where: { id: req.params.id },
+      include: { order: true },
+    });
+    if (!bo) return res.status(404).json({ success: false, message: 'Not found' });
+
+    const maxDue = bo.dueAmount || 0;
+    if (!amount || amount <= 0)
+      return res.status(400).json({ success: false, message: 'পরিমাণ দিন' });
+    if (amount > maxDue)
+      return res.status(400).json({ success: false, message: `সর্বোচ্চ ${maxDue} টাকা` });
+
+    const newDue = Math.max(0, maxDue - amount);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.batchOrder.update({
+        where: { id: req.params.id },
+        data: {
+          dueAmount: newDue,
+          customerPayment: { increment: amount },
+        },
+      });
+      await tx.order.update({
+        where: { id: bo.orderId },
+        data: { dueAmount: newDue },
+      });
+      if (bo.order.customerId) {
+        await tx.customer.update({
+          where: { id: bo.order.customerId },
+          data: {
+            totalPaid: { increment: amount },
+            totalDue: { decrement: amount },
+          },
+        });
+        await tx.payment.create({
+          data: {
+            customerId: bo.order.customerId,
+            orderId: bo.orderId,
+            amount,
+            date: new Date().toISOString().split('T')[0],
+            notes: 'বাকি পরিশোধ',
+          },
+        });
+      }
+      await recomputeBatch(bo.batchId);
+    });
+
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: 'Failed' });
+  }
+});
+
+// PATCH /orders/:id/refund-advance
+router.patch('/:id/refund-advance', async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const order = await prisma.order.findUnique({ where: { id: req.params.id } });
+    if (!order) return res.status(404).json({ success: false, message: 'Not found' });
+
+    const maxRefund = order.advanceAmount || 0;
+    if (!amount || amount <= 0)
+      return res.status(400).json({ success: false, message: 'পরিমাণ দিন' });
+    if (amount > maxRefund)
+      return res.status(400).json({ success: false, message: `সর্বোচ্চ ${maxRefund} টাকা` });
+
+    const newAdvance = Math.max(0, maxRefund - amount);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: req.params.id },
+        data: { advanceAmount: newAdvance },
+      });
+      if (order.customerId) {
+        await tx.customer.update({
+          where: { id: order.customerId },
+          data: { totalPaid: { decrement: amount } },
+        });
+      }
+    });
+
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: 'Failed' });
   }
 });
 export { router as batchRoutes };
