@@ -33,58 +33,103 @@ export async function recomputeBatch(batchId: string) {
 
     if (pona === 'Golda PL') {
       totalOrderedGolda += qty;
-      if (bo.deliveryStatus === 'delivered' || bo.deliveryStatus === 'partial')
+
+      if (bo.deliveryStatus === 'delivered' || bo.deliveryStatus === 'partial') {
         totalDeliveredGolda += bo.deliveredQuantity || 0;
+      }
     }
+
     if (pona === 'Bagda PL') {
       totalOrderedBagda += qty;
-      if (bo.deliveryStatus === 'delivered' || bo.deliveryStatus === 'partial')
+
+      if (bo.deliveryStatus === 'delivered' || bo.deliveryStatus === 'partial') {
         totalDeliveredBagda += bo.deliveredQuantity || 0;
+      }
     }
+
     if (pona === 'Vannamei PL') {
       totalOrderedVannamei += qty;
-      if (bo.deliveryStatus === 'delivered' || bo.deliveryStatus === 'partial')
+
+      if (bo.deliveryStatus === 'delivered' || bo.deliveryStatus === 'partial') {
         totalDeliveredVannamei += bo.deliveredQuantity || 0;
+      }
     }
 
     if (bo.deliveryStatus === 'pending') {
       pendingDeliveries++;
     } else {
       totalCollected += (bo.order.advanceAmount || 0) + (bo.customerPayment || 0);
+
       const due = bo.dueAmount || 0;
+
       totalDue += due;
-      if (due > 0) duePendingCount++;
+
+      if (due > 0) {
+        duePendingCount++;
+      }
     }
   }
 
-  const expenses = await prisma.batchExpense.findMany({ where: { batchId } });
+  const expenses = await prisma.batchExpense.findMany({
+    where: { batchId },
+  });
+
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+
   const totalProfit = totalCollected - totalExpenses;
 
+  // AUTO STATUS COMPUTE
   let status: string;
-  if (pendingDeliveries === batchOrders.length) status = 'pending';
-  else if (pendingDeliveries > 0) status = 'in_progress';
-  else if (totalDue > 0) status = 'has_due';
-  else status = 'completed';
+
+  if (pendingDeliveries === batchOrders.length) {
+    status = 'pending';
+  } else if (pendingDeliveries > 0) {
+    status = 'in_progress';
+  } else if (totalDue > 0) {
+    status = 'has_due';
+  } else {
+    status = 'completed';
+  }
+
+  // PROTECT CLOSED STATUS
+  const current = await prisma.batch.findUnique({
+    where: { id: batchId },
+    select: { status: true },
+  });
+
+  const newStatus = current?.status === 'closed' ? 'closed' : status;
 
   return prisma.batch.update({
     where: { id: batchId },
     data: {
       totalOrderedGolda,
       totalDeliveredGolda,
+
       totalOrderedBagda,
       totalDeliveredBagda,
+
       totalOrderedVannamei,
       totalDeliveredVannamei,
+
       totalCollected,
       totalDue,
+
       totalExpenses,
       totalProfit,
+
       pendingDeliveries,
       duePendingCount,
-      status,
+
+      status: newStatus,
     },
-    include: { batchOrders: { include: { order: true } }, expenses: true },
+    include: {
+      batchOrders: {
+        include: {
+          order: true,
+        },
+      },
+      expenses: true,
+    },
   });
 }
 
@@ -705,4 +750,28 @@ router.patch('/:id/complete', async (req, res) => {
   }
 });
 
+// PATCH /batches/:id/close
+router.patch('/:id/close', async (req, res) => {
+  try {
+    const batch = await prisma.batch.findUnique({
+      where: { id: req.params.id },
+      include: { batchOrders: true },
+    });
+    if (!batch) return res.status(404).json({ success: false, message: 'Not found' });
+    if (batch.status === 'closed')
+      return res.status(400).json({ success: false, message: 'Already closed' });
+    if (batch.status === 'pending' || batch.status === 'in_progress') {
+      return res.status(400).json({ success: false, message: 'সব ডেলিভারি সম্পন্ন করুন আগে' });
+    }
+
+    await prisma.batch.update({
+      where: { id: req.params.id },
+      data: { status: 'closed', completedAt: new Date() },
+    });
+
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: 'Failed to close batch' });
+  }
+});
 export { router as batchRoutes };

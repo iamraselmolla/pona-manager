@@ -61,21 +61,8 @@ export const batchAPI = {
     },
   ) => apiClient.patch(`/batches/${batchId}/orders/${batchOrderId}/deliver`, data),
 
-  // ── Complete batch ────────────────────────────────────────────────────────────
-  // complete: (
-  //   batchId: string,
-  //   data: {
-  //     expenses: Array<{ label: string; amount: number }>;
-  //     notes?: string;
-  //   },
-  // ) => apiClient.patch(`/batches/${batchId}/complete`, data),
-
-  // ── Collection ────────────────────────────────────────────────────────────────
   getCollection: (batchId: string) => apiClient.get(`/batches/${batchId}/collection`),
 
-  // ADD these to src/api/batchServices.ts
-
-  // ── Expenses ──────────────────────────────────────────────────────────────────
   getExpenses: (batchId: string) => apiClient.get(`/batches/${batchId}/expenses`),
 
   addExpense: (
@@ -88,9 +75,14 @@ export const batchAPI = {
     },
   ) => apiClient.post(`/batches/${batchId}/expenses`, data),
 
-  deleteExpense: (batchId: string, expenseId: string) =>
-    apiClient.delete(`/batches/${batchId}/expenses/${expenseId}`),
-
   // ── Complete batch ────────────────────────────────────────────────────────────
   complete: (batchId: string) => apiClient.patch(`/batches/${batchId}/complete`),
+
+  deleteExpense: (batchId: string, expenseId: string) =>
+    apiClient.delete(`/batches/${batchId}/expenses/${expenseId}`),
+  closeBatch: (batchId: string) => apiClient.patch(`/batches/${batchId}/close`),
+  recordDuePayment: (batchOrderId: string, amount: number) =>
+    apiClient.patch(`/batch-orders/${batchOrderId}/pay-due`, { amount }),
+  recordAdvanceRefund: (orderId: string, amount: number) =>
+    apiClient.patch(`/orders/${orderId}/refund-advance`, { amount }),
 };
