@@ -1,6 +1,6 @@
 // src/screens/orders/OrderListScreen.tsx
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,46 +12,43 @@ import {
   ActivityIndicator,
   Animated,
   useColorScheme,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
-import { orderAPI } from "../../api/services";
-import { Order } from "../../types";
-import {
-  formatCurrency,
-  formatDate,
-  getPonaTypeColor,
-} from "../../utils/helpers";
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { orderAPI } from '../../api/services';
+import { Order } from '../../types';
+import { formatCurrency, formatDate, getPonaTypeColor } from '../../utils/helpers';
+import { SalesReportGenerator } from '../reports/SalesReportGenerator';
 
 // ─────────────────────────────────────────────────────────────
 // Theme creator
 // ─────────────────────────────────────────────────────────────
 
 const createPalette = (dark: boolean) => ({
-  bg: dark ? "#0F1117" : "#F5F7FB",
-  surface: dark ? "#1A1D27" : "#FFFFFF",
-  surfaceRaised: dark ? "#21253A" : "#FFFFFF",
-  border: dark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.08)",
+  bg: dark ? '#0F1117' : '#F5F7FB',
+  surface: dark ? '#1A1D27' : '#FFFFFF',
+  surfaceRaised: dark ? '#21253A' : '#FFFFFF',
+  border: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)',
 
-  accent: "#6C63FF",
-  accentSoft: dark ? "rgba(108,99,255,0.15)" : "rgba(108,99,255,0.10)",
+  accent: '#6C63FF',
+  accentSoft: dark ? 'rgba(108,99,255,0.15)' : 'rgba(108,99,255,0.10)',
 
-  gold: "#F5C542",
+  gold: '#F5C542',
 
-  danger: "#FF5E7E",
-  dangerSoft: dark ? "rgba(255,94,126,0.12)" : "rgba(255,94,126,0.10)",
+  danger: '#FF5E7E',
+  dangerSoft: dark ? 'rgba(255,94,126,0.12)' : 'rgba(255,94,126,0.10)',
 
-  success: "#2ECC71",
-  successSoft: dark ? "rgba(46,204,113,0.12)" : "rgba(46,204,113,0.10)",
+  success: '#2ECC71',
+  successSoft: dark ? 'rgba(46,204,113,0.12)' : 'rgba(46,204,113,0.10)',
 
-  warning: "#F0A500",
-  warningSoft: dark ? "rgba(240,165,0,0.12)" : "rgba(240,165,0,0.10)",
+  warning: '#F0A500',
+  warningSoft: dark ? 'rgba(240,165,0,0.12)' : 'rgba(240,165,0,0.10)',
 
-  textPrimary: dark ? "#F0F2FF" : "#111827",
-  textSecondary: dark ? "#8A8FA8" : "#4B5563",
-  textMuted: dark ? "#545872" : "#9CA3AF",
+  textPrimary: dark ? '#F0F2FF' : '#111827',
+  textSecondary: dark ? '#8A8FA8' : '#4B5563',
+  textMuted: dark ? '#545872' : '#9CA3AF',
 
-  white: "#FFFFFF",
+  white: '#FFFFFF',
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -59,43 +56,40 @@ const createPalette = (dark: boolean) => ({
 // ─────────────────────────────────────────────────────────────
 
 const getStatusTheme = (status: string, P: any) => {
-  const STATUS_THEME: Record<
-    string,
-    { label: string; bg: string; color: string; icon: string }
-  > = {
+  const STATUS_THEME: Record<string, { label: string; bg: string; color: string; icon: string }> = {
     pending: {
-      label: "Pending",
+      label: 'Pending',
       bg: P.warningSoft,
       color: P.warning,
-      icon: "time-outline",
+      icon: 'time-outline',
     },
     partial: {
-      label: "Partial",
+      label: 'Partial',
       bg: P.accentSoft,
       color: P.accent,
-      icon: "hourglass-outline",
+      icon: 'hourglass-outline',
     },
     delivered: {
-      label: "Delivered",
+      label: 'Delivered',
       bg: P.successSoft,
       color: P.success,
-      icon: "checkmark-circle-outline",
+      icon: 'checkmark-circle-outline',
     },
     cancelled: {
-      label: "Cancelled",
+      label: 'Cancelled',
       bg: P.dangerSoft,
       color: P.danger,
-      icon: "close-circle-outline",
+      icon: 'close-circle-outline',
     },
     __default__: {
-      label: "Unknown",
+      label: 'Unknown',
       bg: P.border,
       color: P.textMuted,
-      icon: "help-circle-outline",
+      icon: 'help-circle-outline',
     },
   };
 
-  return STATUS_THEME[status] ?? STATUS_THEME["__default__"];
+  return STATUS_THEME[status] ?? STATUS_THEME['__default__'];
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -140,9 +134,7 @@ const OrderCard = ({
   const hasDue = order.dueAmount > 0;
 
   return (
-    <Animated.View
-      style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
-    >
+    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
       <TouchableOpacity
         style={[
           styles.card,
@@ -159,14 +151,9 @@ const OrderCard = ({
         <View style={styles.cardBody}>
           <View style={styles.cardHeader}>
             <View style={styles.customerInfo}>
-              <View
-                style={[
-                  styles.avatarCircle,
-                  { backgroundColor: typeColor + "22" },
-                ]}
-              >
+              <View style={[styles.avatarCircle, { backgroundColor: typeColor + '22' }]}>
                 <Text style={[styles.avatarText, { color: typeColor }]}>
-                  {(order.customerName ?? "?")[0].toUpperCase()}
+                  {(order.customerName ?? '?')[0].toUpperCase()}
                 </Text>
               </View>
 
@@ -184,9 +171,7 @@ const OrderCard = ({
               </View>
             </View>
 
-            <View
-              style={[styles.statusBadge, { backgroundColor: statusTheme.bg }]}
-            >
+            <View style={[styles.statusBadge, { backgroundColor: statusTheme.bg }]}>
               <Ionicons
                 name={statusTheme.icon as any}
                 size={10}
@@ -207,14 +192,12 @@ const OrderCard = ({
               style={[
                 styles.typePill,
                 {
-                  backgroundColor: typeColor + "18",
-                  borderColor: typeColor + "44",
+                  backgroundColor: typeColor + '18',
+                  borderColor: typeColor + '44',
                 },
               ]}
             >
-              <Text style={[styles.typePillText, { color: typeColor }]}>
-                {order.ponaType}
-              </Text>
+              <Text style={[styles.typePillText, { color: typeColor }]}>{order.ponaType}</Text>
             </View>
 
             <View
@@ -225,11 +208,7 @@ const OrderCard = ({
                 },
               ]}
             >
-              <Ionicons
-                name="layers-outline"
-                size={11}
-                color={palette.textMuted}
-              />
+              <Ionicons name="layers-outline" size={11} color={palette.textMuted} />
 
               <Text style={[styles.qtyText, { color: palette.textSecondary }]}>
                 {(order.plQuantity ?? 0).toLocaleString()} PL
@@ -244,11 +223,7 @@ const OrderCard = ({
                 },
               ]}
             >
-              <Ionicons
-                name="calendar-outline"
-                size={11}
-                color={palette.textMuted}
-              />
+              <Ionicons name="calendar-outline" size={11} color={palette.textMuted} />
 
               <Text style={[styles.dateText, { color: palette.textSecondary }]}>
                 {formatDate(order.deliveryDate)}
@@ -258,61 +233,33 @@ const OrderCard = ({
 
           <View style={styles.cardFooter}>
             <View>
-              <Text style={[styles.amountLabel, { color: palette.textMuted }]}>
-                Total
-              </Text>
+              <Text style={[styles.amountLabel, { color: palette.textMuted }]}>Total</Text>
 
-              <Text
-                style={[styles.amountValue, { color: palette.textPrimary }]}
-              >
+              <Text style={[styles.amountValue, { color: palette.textPrimary }]}>
                 {formatCurrency(order.totalPrice)}
               </Text>
             </View>
 
             {hasDue ? (
-              <View
-                style={[
-                  styles.dueChip,
-                  { backgroundColor: palette.dangerSoft },
-                ]}
-              >
-                <Ionicons
-                  name="alert-circle"
-                  size={11}
-                  color={palette.danger}
-                />
+              <View style={[styles.dueChip, { backgroundColor: palette.dangerSoft }]}>
+                <Ionicons name="alert-circle" size={11} color={palette.danger} />
 
                 <Text style={[styles.dueText, { color: palette.danger }]}>
                   Due {formatCurrency(order.dueAmount)}
                 </Text>
               </View>
             ) : (
-              <View
-                style={[
-                  styles.paidChip,
-                  { backgroundColor: palette.successSoft },
-                ]}
-              >
-                <Ionicons
-                  name="checkmark-circle"
-                  size={11}
-                  color={palette.success}
-                />
+              <View style={[styles.paidChip, { backgroundColor: palette.successSoft }]}>
+                <Ionicons name="checkmark-circle" size={11} color={palette.success} />
 
-                <Text style={[styles.paidText, { color: palette.success }]}>
-                  Paid
-                </Text>
+                <Text style={[styles.paidText, { color: palette.success }]}>Paid</Text>
               </View>
             )}
           </View>
         </View>
 
         <View style={styles.chevronWrap}>
-          <Ionicons
-            name="chevron-forward"
-            size={16}
-            color={palette.textMuted}
-          />
+          <Ionicons name="chevron-forward" size={16} color={palette.textMuted} />
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -324,11 +271,11 @@ const OrderCard = ({
 // ─────────────────────────────────────────────────────────────
 
 const FILTERS = [
-  { key: "", label: "All" },
-  { key: "pending", label: "Pending" },
-  { key: "partial", label: "Partial" },
-  { key: "delivered", label: "Delivered" },
-  { key: "cancelled", label: "Cancelled" },
+  { key: '', label: 'All' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'partial', label: 'Partial' },
+  { key: 'delivered', label: 'Delivered' },
+  { key: 'cancelled', label: 'Cancelled' },
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -339,15 +286,15 @@ export const OrderListScreen = () => {
   const navigation = useNavigation<any>();
 
   const scheme = useColorScheme();
-  const dark = scheme === "dark";
+  const dark = scheme === 'dark';
 
   const P = createPalette(dark);
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -360,13 +307,28 @@ export const OrderListScreen = () => {
 
       setOrders(Array.isArray(raw) ? raw : []);
     } catch (e) {
-      console.error("fetchOrders error:", e);
+      console.error('fetchOrders error:', e);
       setOrders([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [search, statusFilter]);
+  const fetchDeliveredOrders = async (from: string, to: string) => {
+    try {
+      const res = await orderAPI.getAll({
+        status: 'delivered',
+        fromDate: from,
+        toDate: to,
+        limit: 10000,
+        page: 1,
+      });
+      return res?.data?.data?.data || [];
+    } catch (error) {
+      console.log('fetchDeliveredOrders error:', error);
+      return [];
+    }
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -379,18 +341,16 @@ export const OrderListScreen = () => {
 
       <View style={styles.header}>
         <View>
-          <Text style={[styles.headerTitle, { color: P.textPrimary }]}>
-            Orders
-          </Text>
+          <Text style={[styles.headerTitle, { color: P.textPrimary }]}>Orders</Text>
 
           <Text style={[styles.headerSub, { color: P.textMuted }]}>
-            {orders.length} {orders.length === 1 ? "order" : "orders"}
+            {orders.length} {orders.length === 1 ? 'order' : 'orders'}
           </Text>
         </View>
-
+        <SalesReportGenerator fetchDeliveredOrders={fetchDeliveredOrders} />
         <TouchableOpacity
           style={[styles.addBtn, { backgroundColor: P.accent }]}
-          onPress={() => navigation.navigate("CreateOrder")}
+          onPress={() => navigation.navigate('CreateOrder')}
         >
           <Ionicons name="add" size={20} color={P.white} />
 
@@ -420,7 +380,7 @@ export const OrderListScreen = () => {
         />
 
         {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch("")}>
+          <TouchableOpacity onPress={() => setSearch('')}>
             <Ionicons name="close-circle" size={16} color={P.textMuted} />
           </TouchableOpacity>
         )}
@@ -433,13 +393,11 @@ export const OrderListScreen = () => {
           const active = statusFilter === f.key;
 
           const theme =
-            f.key === ""
-              ? { color: P.accent, bg: P.accentSoft }
-              : getStatusTheme(f.key, P);
+            f.key === '' ? { color: P.accent, bg: P.accentSoft } : getStatusTheme(f.key, P);
 
           return (
             <TouchableOpacity
-              key={f.key || "all"}
+              key={f.key || 'all'}
               style={[
                 styles.filterChip,
                 {
@@ -448,7 +406,7 @@ export const OrderListScreen = () => {
                 },
                 active && {
                   backgroundColor: theme.bg,
-                  borderColor: theme.color + "55",
+                  borderColor: theme.color + '55',
                 },
               ]}
               onPress={() => setStatusFilter(f.key)}
@@ -473,9 +431,7 @@ export const OrderListScreen = () => {
         <View style={styles.center}>
           <ActivityIndicator size="large" color={P.accent} />
 
-          <Text style={[styles.loadingText, { color: P.textMuted }]}>
-            Loading orders…
-          </Text>
+          <Text style={[styles.loadingText, { color: P.textMuted }]}>Loading orders…</Text>
         </View>
       ) : (
         <FlatList
@@ -487,7 +443,7 @@ export const OrderListScreen = () => {
               index={index}
               palette={P}
               onPress={() =>
-                navigation.navigate("OrderDetails", {
+                navigation.navigate('OrderDetails', {
                   orderId: item.id,
                 })
               }
@@ -515,21 +471,13 @@ export const OrderListScreen = () => {
                   },
                 ]}
               >
-                <Ionicons
-                  name="receipt-outline"
-                  size={44}
-                  color={P.textMuted}
-                />
+                <Ionicons name="receipt-outline" size={44} color={P.textMuted} />
               </View>
 
-              <Text style={[styles.emptyTitle, { color: P.textPrimary }]}>
-                No orders found
-              </Text>
+              <Text style={[styles.emptyTitle, { color: P.textPrimary }]}>No orders found</Text>
 
               <Text style={[styles.emptySubtitle, { color: P.textMuted }]}>
-                {search
-                  ? `No results for "${search}"`
-                  : "Create your first order to get started"}
+                {search ? `No results for "${search}"` : 'Create your first order to get started'}
               </Text>
             </View>
           }
@@ -551,9 +499,9 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 14,
@@ -561,7 +509,7 @@ const styles = StyleSheet.create({
 
   headerTitle: {
     fontSize: 28,
-    fontWeight: "800",
+    fontWeight: '800',
     letterSpacing: -0.5,
   },
 
@@ -571,8 +519,8 @@ const styles = StyleSheet.create({
   },
 
   addBtn: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 5,
     borderRadius: 12,
     paddingHorizontal: 14,
@@ -580,14 +528,14 @@ const styles = StyleSheet.create({
   },
 
   addBtnText: {
-    color: "#FFFFFF",
+    color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: '700',
   },
 
   searchWrap: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
     marginHorizontal: 16,
     marginBottom: 12,
@@ -604,7 +552,7 @@ const styles = StyleSheet.create({
   },
 
   filterRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     paddingHorizontal: 16,
     gap: 7,
     marginBottom: 12,
@@ -619,13 +567,13 @@ const styles = StyleSheet.create({
 
   filterChipText: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: '600',
   },
 
   card: {
-    flexDirection: "row",
+    flexDirection: 'row',
     borderRadius: 16,
-    overflow: "hidden",
+    overflow: 'hidden',
     borderWidth: 1,
     marginBottom: 10,
   },
@@ -641,22 +589,22 @@ const styles = StyleSheet.create({
   },
 
   chevronWrap: {
-    justifyContent: "center",
+    justifyContent: 'center',
     paddingRight: 12,
     paddingLeft: 4,
   },
 
   cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingTop: 14,
     paddingRight: 8,
   },
 
   customerInfo: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
     flex: 1,
   },
@@ -665,18 +613,18 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   avatarText: {
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: '800',
   },
 
   customerName: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: '700',
     maxWidth: 140,
   },
 
@@ -686,8 +634,8 @@ const styles = StyleSheet.create({
   },
 
   statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -695,7 +643,7 @@ const styles = StyleSheet.create({
 
   statusText: {
     fontSize: 10,
-    fontWeight: "700",
+    fontWeight: '700',
   },
 
   divider: {
@@ -705,10 +653,10 @@ const styles = StyleSheet.create({
   },
 
   metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
-    flexWrap: "wrap",
+    flexWrap: 'wrap',
     paddingRight: 8,
   },
 
@@ -721,12 +669,12 @@ const styles = StyleSheet.create({
 
   typePillText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: '700',
   },
 
   qtyChip: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
     borderRadius: 6,
     paddingHorizontal: 8,
@@ -735,12 +683,12 @@ const styles = StyleSheet.create({
 
   qtyText: {
     fontSize: 11,
-    fontWeight: "600",
+    fontWeight: '600',
   },
 
   dateChip: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
     borderRadius: 6,
     paddingHorizontal: 8,
@@ -752,9 +700,9 @@ const styles = StyleSheet.create({
   },
 
   cardFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingBottom: 14,
     paddingRight: 8,
     marginTop: 10,
@@ -762,18 +710,18 @@ const styles = StyleSheet.create({
 
   amountLabel: {
     fontSize: 10,
-    fontWeight: "500",
+    fontWeight: '500',
   },
 
   amountValue: {
     fontSize: 17,
-    fontWeight: "800",
+    fontWeight: '800',
     letterSpacing: -0.3,
   },
 
   dueChip: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
     borderRadius: 8,
     paddingHorizontal: 10,
@@ -782,12 +730,12 @@ const styles = StyleSheet.create({
 
   dueText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: '700',
   },
 
   paidChip: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
     borderRadius: 8,
     paddingHorizontal: 10,
@@ -796,13 +744,13 @@ const styles = StyleSheet.create({
 
   paidText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: '700',
   },
 
   center: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 12,
   },
 
@@ -812,8 +760,8 @@ const styles = StyleSheet.create({
 
   empty: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingTop: 80,
     gap: 10,
   },
@@ -822,20 +770,20 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     marginBottom: 4,
   },
 
   emptyTitle: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: '700',
   },
 
   emptySubtitle: {
     fontSize: 13,
-    textAlign: "center",
+    textAlign: 'center',
     paddingHorizontal: 40,
   },
 

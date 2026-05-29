@@ -1,5 +1,6 @@
 // src/screens/orders/CreateOrderScreen.tsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from 'react';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   View,
   Text,
@@ -12,14 +13,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, useRoute } from "@react-navigation/native";
-import { customerAPI, orderAPI } from "../../api/services";
-import { Customer, PonaType } from "../../types";
-import { COLORS, PONA_TYPES } from "../../constants";
-import { formatCurrency, formatDate } from "../../utils/helpers";
-import dayjs from "dayjs";
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { customerAPI, orderAPI } from '../../api/services';
+import { Customer, PonaType } from '../../types';
+import { COLORS, PONA_TYPES } from '../../constants';
+import { formatCurrency, formatDate } from '../../utils/helpers';
+import dayjs from 'dayjs';
 
 const InputField = ({
   label,
@@ -40,7 +41,7 @@ const InputField = ({
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
-      keyboardType={keyboardType || "default"}
+      keyboardType={keyboardType || 'default'}
       placeholderTextColor={COLORS.textMuted}
       editable={editable}
     />
@@ -52,26 +53,24 @@ export const CreateOrderScreen = () => {
   const route = useRoute<any>();
   const { customerId: prefillCustomerId } = route.params || {};
 
-  const [mobile, setMobile] = useState("");
+  const [mobile, setMobile] = useState('');
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerLoading, setCustomerLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
-  const [ponaType, setPonaType] = useState<PonaType>("Golda PL");
-  const [plQuantity, setPlQuantity] = useState("");
-  const [unitRate, setUnitRate] = useState("");
-  const [advanceAmount, setAdvanceAmount] = useState("");
-  const [deliveryDate, setDeliveryDate] = useState(
-    dayjs().add(1, "day").format("YYYY-MM-DD"),
-  );
-  const [notes, setNotes] = useState("");
+  const [name, setName] = useState('');
+  const [address, setAddress] = useState('');
+  const [ponaType, setPonaType] = useState<PonaType>('Golda PL');
+  const [plQuantity, setPlQuantity] = useState('');
+  const [unitRate, setUnitRate] = useState('');
+  const [advanceAmount, setAdvanceAmount] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState(dayjs().add(1, 'day').format('YYYY-MM-DD'));
+  const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const totalPrice =
-    (parseFloat(plQuantity) || 0) * (parseFloat(unitRate) || 0);
+  const totalPrice = (parseFloat(plQuantity) || 0) * (parseFloat(unitRate) || 0);
   const dueAmount = Math.max(0, totalPrice - (parseFloat(advanceAmount) || 0));
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Prefill if customerId provided
   useEffect(() => {
@@ -81,7 +80,7 @@ export const CreateOrderScreen = () => {
         setCustomer(c);
         setMobile(c.mobile);
         setName(c.name);
-        setAddress(c.address || "");
+        setAddress(c.address || '');
       });
     }
   }, []);
@@ -94,25 +93,21 @@ export const CreateOrderScreen = () => {
       const c = res.data.data;
       setCustomer(c);
       setName(c.name);
-      setAddress(c.address || "");
+      setAddress(c.address || '');
       if (c.hasRunningOrder) {
-        Alert.alert(
-          "Warning",
-          `${c.name} has a running order. Do you want to continue?`,
-          [
-            {
-              text: "Cancel",
-              style: "cancel",
-              onPress: () => {
-                setMobile("");
-                setCustomer(null);
-                setName("");
-                setAddress("");
-              },
+        Alert.alert('Warning', `${c.name} has a running order. Do you want to continue?`, [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              setMobile('');
+              setCustomer(null);
+              setName('');
+              setAddress('');
             },
-            { text: "Continue", style: "default" },
-          ],
-        );
+          },
+          { text: 'Continue', style: 'default' },
+        ]);
       }
     } catch {
       setCustomer(null);
@@ -126,14 +121,22 @@ export const CreateOrderScreen = () => {
     if (val.length === 11) lookupMobile(val);
     if (val.length < 11) {
       setCustomer(null);
-      setName("");
-      setAddress("");
+      setName('');
+      setAddress('');
+    }
+  };
+
+  const handleDateChange = (_: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+
+    if (selectedDate) {
+      setDeliveryDate(dayjs(selectedDate).format('YYYY-MM-DD'));
     }
   };
 
   const handleSubmit = async () => {
     if (!mobile || !name || !plQuantity || !unitRate || !deliveryDate) {
-      Alert.alert("Validation", "Please fill in all required fields");
+      Alert.alert('Validation', 'Please fill in all required fields');
       return;
     }
     setLoading(true);
@@ -153,16 +156,13 @@ export const CreateOrderScreen = () => {
         notes,
       };
       const result = await orderAPI.create(payload);
-      console.log("Order created:", result);
+      console.log('Order created:', result);
       // Alert.alert("Success", "Order created successfully", [
       //   { text: "OK", onPress: () => navigation.goBack() },
       // ]);
-      navigation.navigate("Orders");
+      navigation.navigate('Orders');
     } catch (err: any) {
-      Alert.alert(
-        "Error",
-        err.response?.data?.message || "Failed to create order",
-      );
+      Alert.alert('Error', err.response?.data?.message || 'Failed to create order');
     } finally {
       setLoading(false);
     }
@@ -171,7 +171,7 @@ export const CreateOrderScreen = () => {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
         {/* Customer Section */}
@@ -195,16 +195,12 @@ export const CreateOrderScreen = () => {
               {customerLoading && (
                 <ActivityIndicator
                   color={COLORS.primary}
-                  style={{ position: "absolute", right: 12 }}
+                  style={{ position: 'absolute', right: 12 }}
                 />
               )}
               {customer && !customerLoading && (
                 <View style={styles.foundBadge}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={16}
-                    color={COLORS.success}
-                  />
+                  <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
                   <Text style={styles.foundText}>Found</Text>
                 </View>
               )}
@@ -212,16 +208,12 @@ export const CreateOrderScreen = () => {
           </View>
 
           {customer && (
-            <TouchableOpacity
-              style={styles.customerInfo}
-              onPress={() => setShowHistory(true)}
-            >
+            <TouchableOpacity style={styles.customerInfo} onPress={() => setShowHistory(true)}>
               <Ionicons name="person-circle" size={20} color={COLORS.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.customerInfoName}>{customer.name}</Text>
                 <Text style={styles.customerInfoSub}>
-                  Orders: {customer.totalOrders} | Due:{" "}
-                  {formatCurrency(customer.totalDue)}
+                  Orders: {customer.totalOrders} | Due: {formatCurrency(customer.totalDue)}
                 </Text>
               </View>
               <Text style={styles.viewHistory}>History →</Text>
@@ -258,18 +250,10 @@ export const CreateOrderScreen = () => {
               {PONA_TYPES.map((t) => (
                 <TouchableOpacity
                   key={t}
-                  style={[
-                    styles.typeBtn,
-                    ponaType === t && styles.typeBtnActive,
-                  ]}
+                  style={[styles.typeBtn, ponaType === t && styles.typeBtnActive]}
                   onPress={() => setPonaType(t)}
                 >
-                  <Text
-                    style={[
-                      styles.typeBtnText,
-                      ponaType === t && styles.typeBtnTextActive,
-                    ]}
-                  >
+                  <Text style={[styles.typeBtnText, ponaType === t && styles.typeBtnTextActive]}>
                     {t}
                   </Text>
                 </TouchableOpacity>
@@ -318,9 +302,7 @@ export const CreateOrderScreen = () => {
               },
             ]}
           >
-            <Text style={[styles.calcLabel, { color: COLORS.danger }]}>
-              Due Amount
-            </Text>
+            <Text style={[styles.calcLabel, { color: COLORS.danger }]}>Due Amount</Text>
             <Text style={[styles.calcValue, { color: COLORS.danger }]}>
               {formatCurrency(dueAmount)}
             </Text>
@@ -330,19 +312,30 @@ export const CreateOrderScreen = () => {
             <Text style={styles.label}>
               Delivery Date <Text style={{ color: COLORS.danger }}>*</Text>
             </Text>
-            <TextInput
+
+            <TouchableOpacity
               style={styles.input}
-              value={deliveryDate}
-              onChangeText={setDeliveryDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={COLORS.textMuted}
-            />
+              onPress={() => setShowDatePicker(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: COLORS.text, fontSize: 15 }}>{deliveryDate}</Text>
+            </TouchableOpacity>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={dayjs(deliveryDate).toDate()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                minimumDate={new Date()}
+                onChange={handleDateChange}
+              />
+            )}
           </View>
 
           <View style={styles.field}>
             <Text style={styles.label}>Notes</Text>
             <TextInput
-              style={[styles.input, { height: 80, textAlignVertical: "top" }]}
+              style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
               value={notes}
               onChangeText={setNotes}
               placeholder="Additional notes..."
@@ -352,20 +345,12 @@ export const CreateOrderScreen = () => {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.submitBtn}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
+        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
           {loading ? (
             <ActivityIndicator color={COLORS.white} />
           ) : (
             <>
-              <Ionicons
-                name="checkmark-circle"
-                size={20}
-                color={COLORS.white}
-              />
+              <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />
               <Text style={styles.submitBtnText}>Create Order</Text>
             </>
           )}
@@ -388,14 +373,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: '800',
     color: COLORS.text,
     marginBottom: 12,
   },
   field: { marginBottom: 14 },
   label: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
     color: COLORS.textSecondary,
     marginBottom: 6,
   },
@@ -409,55 +394,55 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   inputDisabled: {
-    backgroundColor: COLORS.border + "40",
+    backgroundColor: COLORS.border + '40',
     color: COLORS.textSecondary,
   },
-  mobileRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  foundBadge: { flexDirection: "row", alignItems: "center", gap: 4 },
-  foundText: { fontSize: 12, color: COLORS.success, fontWeight: "700" },
+  mobileRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  foundBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  foundText: { fontSize: 12, color: COLORS.success, fontWeight: '700' },
   customerInfo: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
     backgroundColor: COLORS.successLight,
     borderRadius: 8,
     padding: 10,
     marginBottom: 14,
   },
-  customerInfoName: { fontSize: 13, fontWeight: "700", color: COLORS.text },
+  customerInfoName: { fontSize: 13, fontWeight: '700', color: COLORS.text },
   customerInfoSub: { fontSize: 11, color: COLORS.textSecondary },
-  viewHistory: { fontSize: 12, color: COLORS.primary, fontWeight: "700" },
-  typeRow: { flexDirection: "row", gap: 8 },
+  viewHistory: { fontSize: 12, color: COLORS.primary, fontWeight: '700' },
+  typeRow: { flexDirection: 'row', gap: 8 },
   typeBtn: {
     flex: 1,
     padding: 8,
     borderRadius: 8,
     borderWidth: 1.5,
     borderColor: COLORS.border,
-    alignItems: "center",
+    alignItems: 'center',
   },
   typeBtnActive: {
     borderColor: COLORS.primary,
     backgroundColor: COLORS.successLight,
   },
-  typeBtnText: { fontSize: 11, fontWeight: "600", color: COLORS.textSecondary },
+  typeBtnText: { fontSize: 11, fontWeight: '600', color: COLORS.textSecondary },
   typeBtnTextActive: { color: COLORS.primary },
   calcRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 14,
   },
-  calcLabel: { fontSize: 14, fontWeight: "600", color: COLORS.textSecondary },
-  calcValue: { fontSize: 18, fontWeight: "800", color: COLORS.text },
+  calcLabel: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
+  calcValue: { fontSize: 18, fontWeight: '800', color: COLORS.text },
   submitBtn: {
     backgroundColor: COLORS.primary,
     borderRadius: 12,
     padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
   },
-  submitBtnText: { color: COLORS.white, fontWeight: "800", fontSize: 16 },
+  submitBtnText: { color: COLORS.white, fontWeight: '800', fontSize: 16 },
 });

@@ -9,26 +9,76 @@ router.use(authMiddleware);
 
 router.get('/', async (req, res) => {
   try {
-    const { search, status, date, page = '1', limit = '20' } = req.query as any;
+    const { search, status, date, fromDate, toDate, page = '1', limit = '20' } = req.query as any;
+
     const skip = (Number(page) - 1) * Number(limit);
+
     const where: any = {};
-    if (search)
+
+    // ─────────────────────────────────────
+    // Search
+    // ─────────────────────────────────────
+    if (search) {
       where.OR = [
-        { customerName: { contains: search, mode: 'insensitive' } },
-        { customerMobile: { contains: search } },
+        {
+          customerName: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          customerMobile: {
+            contains: search,
+          },
+        },
       ];
-    if (status) where.status = status;
-    if (date) where.deliveryDate = date;
+    }
+
+    // ─────────────────────────────────────
+    // Status filter
+    // ─────────────────────────────────────
+    if (status) {
+      where.status = status;
+    }
+
+    // ─────────────────────────────────────
+    // Single date filter
+    // ─────────────────────────────────────
+    if (date) {
+      where.deliveryDate = date;
+    }
+
+    // ─────────────────────────────────────
+    // Date range filter
+    // deliveryDate is string YYYY-MM-DD
+    // ─────────────────────────────────────
+    if (fromDate || toDate) {
+      where.deliveryDate = {};
+
+      if (fromDate) {
+        where.deliveryDate.gte = fromDate;
+      }
+
+      if (toDate) {
+        where.deliveryDate.lte = toDate;
+      }
+    }
 
     const [data, total] = await Promise.all([
       prisma.order.findMany({
         where,
         skip,
         take: Number(limit),
-        orderBy: { createdAt: 'desc' },
+        orderBy: {
+          deliveryDate: 'desc',
+        },
       }),
-      prisma.order.count({ where }),
+
+      prisma.order.count({
+        where,
+      }),
     ]);
+
     res.json({
       success: true,
       data: {
@@ -39,8 +89,13 @@ router.get('/', async (req, res) => {
         totalPages: Math.ceil(total / Number(limit)),
       },
     });
-  } catch {
-    res.status(500).json({ success: false, message: 'Failed to fetch orders' });
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch orders',
+    });
   }
 });
 
