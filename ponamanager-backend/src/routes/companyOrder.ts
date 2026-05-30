@@ -256,4 +256,75 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// PATCH /company-orders/:id/apply-discount
+router.patch('/:id/apply-discount', async (req, res) => {
+  try {
+    const { discountPercent } = req.body;
+    console.log('Applying discount', { id: req.params.id, discountPercent });
+    if (!discountPercent || discountPercent <= 0 || discountPercent > 100) {
+      return res.status(400).json({ success: false, message: 'সঠিক ছাড়ের % দিন' });
+    }
+
+    const co = await prisma.companyOrder.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!co) return res.status(404).json({ success: false, message: 'Not found' });
+    if (co.status !== 'delivered') {
+      return res
+        .status(400)
+        .json({ success: false, message: 'পোনা receive করার পরে ছাড় দেওয়া যাবে' });
+    }
+
+    const totalPL = co.totalPL ?? co.expectedPL ?? 0;
+    const ratePerPL = co.ratePerPL ?? 0;
+    const actualAmount = co.actualAmount ?? co.paymentAmount ?? 0;
+    const prevAdvance = co.netAdvance ?? 0;
+    const prevDue = co.netDue ?? 0;
+
+    const discountPL = totalPL * (discountPercent / 100);
+    const discountAmount = discountPL * ratePerPL;
+    const finalNetAmount = actualAmount - discountAmount;
+
+    // Recompute due/advance after discount
+    const paid = co.paymentAmount ?? 0;
+    const newNetDue = Math.max(0, finalNetAmount - paid);
+    const newNetAdvance = Math.max(0, paid - finalNetAmount);
+
+    // Auto note
+    const note = [
+      `=== PL ছাড় সমন্বয় ===`,
+      `আগের মোট PL: ${totalPL.toLocaleString()}`,
+      `আগের মোট দাম: ৳${actualAmount.toLocaleString()}`,
+      `আগের জমা: ৳${paid.toLocaleString()}`,
+      `আগের অগ্রীম: ৳${prevAdvance.toLocaleString()}`,
+      `আগের বাকি: ৳${prevDue.toLocaleString()}`,
+      `---`,
+      `ছাড়: ${discountPercent}%`,
+      `ছাড়কৃত PL: ${discountPL.toLocaleString()}`,
+      `ছাড়ের টাকা: ৳${discountAmount.toLocaleString()}`,
+      `ছাড়ের পর মোট দাম: ৳${finalNetAmount.toLocaleString()}`,
+      `নতুন অগ্রীম: ৳${newNetAdvance.toLocaleString()}`,
+      `নতুন বাকি: ৳${newNetDue.toLocaleString()}`,
+    ].join('\n');
+
+    await prisma.companyOrder.update({
+      where: { id: req.params.id },
+      data: {
+        plDiscountPercent: discountPercent,
+        plDiscountPL: discountPL,
+        plDiscountAmount: discountAmount,
+        finalNetAmount,
+        netDue: newNetDue,
+        netAdvance: newNetAdvance,
+        discountNotes: note,
+        discountAppliedAt: new Date(),
+      },
+    });
+
+    res.json({ success: true, data: { discountAmount, finalNetAmount, newNetDue, newNetAdvance } });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: 'Failed' });
+  }
+});
+
 export { router as companyOrderRouter };

@@ -241,4 +241,11 @@ model CompanyOrder {
 
   batch           Batch?              @relation(fields: [batchId], references: [id])
   batchOrders     BatchOrder[]        // Orders delivered for this company order
+
+   plDiscountPercent Float?   // যেমন: 5
+  plDiscountPL      Float?   // কত PL ছাড় = totalPL * percent/100
+  plDiscountAmount  Float?   // ছাড়ের টাকা = discountPL * ratePerPL
+  finalNetAmount    Float?   // actualAmount - discountAmount
+  discountNotes     String?  // auto-generated summary
+  discountAppliedAt DateTime?
 }

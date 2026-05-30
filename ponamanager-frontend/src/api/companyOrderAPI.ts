@@ -26,6 +26,8 @@ export const companyOrderAPI = {
       notes?: string;
     },
   ) => apiClient.patch(`/company-orders/${id}/receive`, data),
+  applyDiscount: (id: string, discountPercent: number) =>
+    apiClient.patch(`/company-orders/${id}/apply-discount`, { discountPercent }),
 
   delete: (id: string) => apiClient.delete(`/company-orders/${id}`),
 };

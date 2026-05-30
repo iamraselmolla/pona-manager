@@ -25,6 +25,7 @@ import { orderAPI } from '../../api/services';
 import { Batch, BatchOrder } from '../../types';
 import { formatCurrency, formatDate, getPonaTypeColor } from '../../utils/helpers';
 import { showConfirm } from '../../utils/AppModal';
+import { PLDiscountModal } from '../../utils/PLDiscountModal';
 
 // ─── Theme ──────────────────────────────────────────────────────────────────────
 const LIGHT = {
@@ -1484,7 +1485,17 @@ const AddOrderToBatchModal = ({ visible, batchId, onClose, onAdded }: any) => {
 };
 
 // ─── Company Order Summary ────────────────────────────────────────────────────────
-const CompanyOrderSummary = ({ companyOrder, batchOrders, T, onDisconnect, onViewDetail }: any) => {
+const CompanyOrderSummary = ({
+  companyOrder,
+  batchOrders,
+  T,
+  onDisconnect,
+  onViewDetail,
+  isClosed,
+  showDiscount,
+  setShowDiscount,
+  onSaved,
+}: any) => {
   const totalOurMir = batchOrders?.reduce((s: number, o: any) => s + (o.ourMir ?? 0), 0) ?? 0;
   const totalCompanyMir =
     batchOrders?.reduce((s: number, o: any) => s + (o.companyMir ?? 0), 0) ?? 0;
@@ -1525,6 +1536,24 @@ const CompanyOrderSummary = ({ companyOrder, batchOrders, T, onDisconnect, onVie
               {companyOrder.status === 'delivered' ? 'পাওয়া গেছে' : 'অপেক্ষায়'}
             </Text>
           </View>
+          <PLDiscountModal
+            visible={showDiscount}
+            companyOrder={companyOrder}
+            onClose={() => setShowDiscount(false)}
+            onSaved={onSaved}
+          />
+          {!isClosed && companyOrder?.status === 'delivered' && (
+            <TouchableOpacity
+              style={[
+                styles.companyDiscountBtn,
+                { borderColor: T.warning, backgroundColor: T.warningSoft },
+              ]}
+              onPress={() => setShowDiscount(true)}
+            >
+              <Ionicons name="pricetag-outline" size={12} color={T.warning} />
+              <Text style={[{ fontSize: 10, fontWeight: '700', color: T.warning }]}>PL ছাড়</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[styles.companyDisconnectBtn, { borderColor: T.border }]}
             onPress={onDisconnect}
@@ -2136,6 +2165,7 @@ export const BatchDetailsScreen = () => {
   const [addOrderModalVisible, setAddOrderModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [showDiscount, setShowDiscount] = useState(false);
 
   // Due / Advance modals
   const [dueBO, setDueBO] = useState<any>(null);
@@ -2476,6 +2506,10 @@ export const BatchDetailsScreen = () => {
               onViewDetail={() =>
                 navigation.navigate('CompanyOrderDetail', { orderId: companyOrder.id })
               }
+              isClosed={isClosed}
+              showDiscount={showDiscount}
+              setShowDiscount={setShowDiscount}
+              onSaved={fetchBatch}
             />
           </View>
         ) : (
@@ -2875,6 +2909,15 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   completeBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  companyDiscountBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 7,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
 });
 
 const rowStyles = StyleSheet.create({
